@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+folio_project_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+if command -v node >/dev/null 2>&1; then
+  exec node "$folio_project_dir/cli/main.cjs" "$@"
+fi
+folio_selected=''
+for folio_bundle in /Applications/Folio.app "$folio_project_dir"/release/*/mac-*/Folio.app; do
+  if [ -x "$folio_bundle/Contents/Resources/bin/folio" ]; then
+    if [ -z "$folio_selected" ] || [ "$folio_bundle/Contents/Resources/bin/folio" -nt "$folio_selected/Contents/Resources/bin/folio" ]; then
+      folio_selected="$folio_bundle"
+    fi
+  fi
+done
+if [ -n "$folio_selected" ]; then
+  exec "$folio_selected/Contents/Resources/bin/folio" "$@"
+fi
+echo 'Install Node.js 22+ or use the CLI bundled with Folio.app.' >&2
+exit 4

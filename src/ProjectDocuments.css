@@ -1,0 +1,155 @@
+.workspace-file-view {
+  display: flex;
+  gap: 3px;
+  margin: 0 14px 14px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--selected);
+}
+.workspace-file-view > button {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 5px 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.workspace-file-view > button[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--paper);
+  box-shadow: 0 1px 3px #0001;
+}
+.project-document-search {
+  margin-bottom: 13px;
+}
+.project-document-search > svg,
+.project-document-row > svg {
+  flex-shrink: 0;
+}
+.project-document-search > button {
+  border: 0;
+  padding: 3px;
+  color: var(--muted);
+}
+.project-document-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  gap: 9px;
+  padding: 10px 17px;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  justify-content: flex-start;
+  color: var(--text);
+  position: relative;
+}
+.project-document-row > svg {
+  color: var(--faint);
+}
+.project-document-row > span {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  flex-direction: column;
+}
+.project-document-row strong,
+.project-document-row small {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.project-document-row strong {
+  font-weight: 500;
+  font-size: 13px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.45;
+}
+.project-document-row small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.project-document-row.selected {
+  background: var(--selected);
+  color: var(--accent);
+}
+.project-document-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--accent);
+}
+.project-document-row.selected > svg {
+  color: var(--accent);
+}
+.project-document-message {
+  padding: 12px 18px;
+}
+.project-document-message > small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.project-document-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px 14px 8px;
+}
+.project-document-options > button {
+  border: 0;
+  padding: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.project-document-options > button.selected {
+  color: var(--accent);
+  background: var(--selected);
+}
+.project-document-hint {
+  padding: 0 18px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.7;
+}
+.project-document-pagination {
+  padding: 10px 18px;
+}
+.project-document-pagination > button {
+  width: 100%;
+  padding: 7px 10px;
+  border-color: var(--border);
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.sidebar-content.document-mode {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-content.document-mode > .workspace-file-view {
+  flex: none;
+}
+.project-documents {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.project-documents > :not(.project-document-list) {
+  flex: none;
+}
+.project-document-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}

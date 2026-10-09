@@ -1,0 +1,26 @@
+{
+  "name": "folio",
+  "version": "0.5.0",
+  "description": "Read, find, create, and edit shared Markdown documents through the independent Folio CLI.",
+  "author": {
+    "name": "Folio"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Folio",
+    "shortDescription": "Documents for people and coding agents",
+    "developerName": "Folio",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Read and update a Folio document",
+      "Find relevant documents for this task"
+    ],
+    "brandColor": "#526B50",
+    "logo": "./assets/icon.png",
+    "longDescription": "Find project documents, read current or historical revisions, and apply version-checked edits alongside people. Optional project memory helps locate sources while original Markdown stays local."
+  }
+}

@@ -1,0 +1,41 @@
+node_modules
+dist/
+release/
+.DS_Store
+*.tsbuildinfo
+.folio-local/
+
+dist-cli/
+
+# Credentials and local application state
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.pem
+*.key
+*.log
+.folio-data/
+/cloud/
+/history/
+/drafts/
+/knowledge/
+/agent-tasks/
+/document-index/
+/dingtalk/
+/locks/
+
+# Local research and acceptance artifacts
+/design-qa.md
+/docs/research/
+/docs/verification/
+/docs/验收记录*.md
+/docs/*研究与实现说明.md
+
+third-party-licenses/
+
+dist-updater/
+
+# Local Claude Code session / launch configuration; distributed plugins live in integrations/.
+/.claude/

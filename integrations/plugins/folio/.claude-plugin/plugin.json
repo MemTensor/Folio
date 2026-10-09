@@ -1,0 +1,9 @@
+{
+  "name": "folio",
+  "version": "0.5.0",
+  "description": "Read, find, create, and edit shared Markdown documents through the independent Folio CLI.",
+  "author": {
+    "name": "Folio"
+  },
+  "skills": "./skills/"
+}

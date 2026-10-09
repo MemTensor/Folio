@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import vm from 'node:vm';
+import { REPOSITORY as publishingRepository } from '../scripts/publish-release.mjs';
+const require = createRequire(import.meta.url);
+const updating = require('../core/update-release.cjs');
+const source = await fs.readFile(new URL('../core/repository.cjs', import.meta.url), 'utf8');
+
+function identity(url) {
+  const context = {
+    require: () => ({ repository: { url } }),
+    module: { exports: {} },
+  };
+  vm.runInNewContext(source, context);
+  return context.module.exports;
+}
+
+test('publication and update transport share the canonical repository', () => {
+  assert.equal(publishingRepository, 'MemTensor/Folio');
+  assert.equal(updating.REPOSITORY, publishingRepository);
+  assert.equal(updating.RELEASE_PAGE, 'https://github.com/MemTensor/Folio/releases');
+});
+
+test('repository identity rejects arbitrary endpoints and malformed paths', () => {
+  for (const url of [
+    'http://github.com/owner/repo.git',
+    'https://github.com.attacker.invalid/owner/repo.git',
+    'https://token@github.com/owner/repo.git',
+    'https://github.com/owner/repo.git?token=x',
+    'https://github.com/owner/repo.git#fragment',
+    'https://github.com/owner/../repo.git',
+    undefined,
+  ])
+    assert.throws(() => identity(url), /Invalid GitHub repository/);
+  assert.equal(identity('https://github.com/MemTensor/Folio.git').REPOSITORY, 'MemTensor/Folio');
+});
