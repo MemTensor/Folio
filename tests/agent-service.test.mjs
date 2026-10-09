@@ -146,6 +146,26 @@ test('opening a panel is local-only; subscription login uses the official browse
   assert.throws(() => authURL('https://token@auth.openai.com/authorize'));
 });
 
+test('a blocked browser keeps one valid sign-in link and repeated connects never discard the pending flow', async (t) => {
+  const { service, client } = await fixture(t);
+  client.account = null;
+  service.openExternal = async () => {
+    throw Error('PRIVATE_BROWSER_DETAIL');
+  };
+  await service.connect();
+  await service.login();
+  assert.equal(service.status().waiting, true);
+  assert.equal(service.status().loginURL, 'https://auth.openai.com/authorize?fixture=yes');
+  assert.doesNotMatch(service.status().message, /PRIVATE_BROWSER/);
+  await service.connect();
+  await service.login();
+  assert.equal(client.calls.filter((call) => call.method === 'account/login/start').length, 1);
+  await service.cancelLogin();
+  assert.equal(service.status().loginURL, undefined);
+  await service.disconnect();
+  assert.equal(service.loginURL, null);
+});
+
 test('selection sends only chosen Markdown and proposals stay local until accepted', async (t) => {
   const { service, client, input, complete } = await fixture(t);
   await service.connect();

@@ -140,17 +140,34 @@ export function AgentSettings() {
             >
               {connection.provider !== 'api' && connection.phase === 'ready'
                 ? t('重新检查连接')
-                : t('登录或连接 ChatGPT')}
+                : connection.waiting && connection.loginURL
+                  ? t('打开登录页')
+                  : t('登录或连接 ChatGPT')}
             </button>
             {connection.provider !== 'api' && connection.waiting && (
-              <button
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => updateConnection(await bridge.agentCancelLogin()))
-                }
-              >
-                {t('取消登录')}
-              </button>
+              <>
+                {connection.loginURL && (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        await navigator.clipboard.writeText(connection.loginURL!);
+                        setMessage(t('已复制登录链接。'));
+                      })
+                    }
+                  >
+                    {t('复制登录链接')}
+                  </button>
+                )}
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => updateConnection(await bridge.agentCancelLogin()))
+                  }
+                >
+                  {t('取消登录')}
+                </button>
+              </>
             )}
           </div>
         </section>
@@ -289,6 +306,21 @@ export function AgentSettings() {
         <p className="knowledge-message" role="status">
           {message}
         </p>
+      )}
+      {bridge.desktop && (
+        <div className="agent-settings-disconnect">
+          <span>{t('诊断信息仅含运行事件，日志最多约 1 MB；不包含正文、对话或凭据。')}</span>
+          <button
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                if (await bridge.exportDiagnostics()) setMessage(t('诊断信息已导出。'));
+              })
+            }
+          >
+            {t('导出诊断信息')}
+          </button>
+        </div>
       )}
     </div>
   );

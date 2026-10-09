@@ -120,6 +120,8 @@ export function AgentPanel({
   disabled,
 }: Props) {
   const connection = useSyncExternalStore(watchAgentConnection, agentConnection);
+  const [loginCopied, setLoginCopied] = useState(false);
+  useEffect(() => setLoginCopied(false), [connection.loginURL]);
   const setConnection = receiveAgentConnection;
   const [session, setSession] = useState<AgentSession>({ root, messages: [], running: false });
   const [sessionReady, setSessionReady] = useState(false);
@@ -509,15 +511,31 @@ export function AgentPanel({
             {t('使用兼容 API')}
           </button>
           {connection.waiting && (
-            <button
-              className="agent-quiet"
-              disabled={busy}
-              onClick={() =>
-                void operation(async () => setConnection(await bridge.agentCancelLogin()))
-              }
-            >
-              {t('取消登录')}
-            </button>
+            <>
+              {connection.loginURL && (
+                <button
+                  className="agent-quiet"
+                  disabled={busy}
+                  onClick={() =>
+                    void operation(async () => {
+                      await navigator.clipboard.writeText(connection.loginURL!);
+                      setLoginCopied(true);
+                    })
+                  }
+                >
+                  {loginCopied ? t('已复制登录链接。') : t('复制登录链接')}
+                </button>
+              )}
+              <button
+                className="agent-quiet"
+                disabled={busy}
+                onClick={() =>
+                  void operation(async () => setConnection(await bridge.agentCancelLogin()))
+                }
+              >
+                {t('取消登录')}
+              </button>
+            </>
           )}
           {connection.phase === 'missing' && (
             <button

@@ -431,6 +431,24 @@ async function verifyAgentPanel(window, original, capturePath, language) {
     await evaluate(() => !!document.querySelector('.agent-settings-disconnect button')),
     true,
   );
+  await evaluate(
+    (label) =>
+      [...document.querySelectorAll('.agent-settings button')]
+        .find((button) => button.textContent.trim() === label)
+        .click(),
+    en ? 'Export diagnostics' : '导出诊断信息',
+  );
+  await wait(() =>
+    ['Diagnostics exported.', '诊断信息已导出。'].includes(
+      document.querySelector('.agent-settings .knowledge-message')?.textContent.trim(),
+    ),
+  );
+  assert.equal(
+    await evaluate(() =>
+      document.querySelector('.agent-settings .knowledge-message').textContent.trim(),
+    ),
+    en ? 'Diagnostics exported.' : '诊断信息已导出。',
+  );
   if (capturePath) {
     await web.executeJavaScript(
       'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',

@@ -25,6 +25,7 @@ const { Workspaces } = require('../core/workspaces.cjs');
 const { DocumentLibrary } = require('../core/library.cjs');
 const { createProjectServices } = require('./projects.cjs');
 let projects,
+  diagnostics,
   rebuildMenu = () => {};
 let language = 'zh-CN';
 const translateUI = (message) => {
@@ -211,6 +212,7 @@ function handle(name, fn) {
     try {
       return await fn(...args);
     } catch (error) {
+      diagnostics?.record('ipc-failure', { operation: name, code: error.code });
       throw Object.assign(new Error(translateUI(error.message || String(error))), {
         code: error.code,
       });
@@ -221,6 +223,21 @@ function handle(name, fn) {
 }
 async function init() {
   await fs.mkdir(app.getPath('userData'), { recursive: true });
+  diagnostics = new (require('../core/diagnostics.cjs').Diagnostics)(app.getPath('userData'), {
+    version: app.getVersion(),
+  });
+  diagnostics.record('app-start');
+  handle('diagnostics-export', async () => {
+    const snapshot = await diagnostics.snapshot();
+    const result = await dialog.showSaveDialog(win, {
+      title: translateUI('导出诊断信息'),
+      defaultPath: 'Folio-diagnostics-' + new Date().toISOString().slice(0, 10) + '.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    await fs.writeFile(result.filePath, snapshot, { mode: 0o600 });
+    return result.filePath;
+  });
   workspaces = new Workspaces(app.getPath('userData'));
   dingtalk = new DingTalkSync(app.getPath('userData'));
   cloud = new MemosCloud(app.getPath('userData'));
@@ -230,6 +247,7 @@ async function init() {
     listDocuments: (root, options) => documentCatalog.list(root, options),
     getPreview: (input) => require('./agent-preview.cjs').captureDocumentPreview(win, input),
     contextEnabled: true,
+    diagnostics,
     dataDir: app.getPath('userData'),
     version: app.getVersion(),
     onEvent: (event) => send('agent-event', event),
@@ -1073,6 +1091,7 @@ require('./shutdown.cjs').installShutdown(
       projects?.close(),
       agent?.close(),
     ]);
+    await diagnostics?.writing;
   },
   (error) => {
     try {

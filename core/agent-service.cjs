@@ -91,14 +91,24 @@ class AgentService {
     apiClient,
     documentTools,
     contextEnabled = false,
+    diagnostics,
   }) {
-    Object.assign(this, { dataDir, onEvent, openExternal, turnTimeout, idleDelay, recoveryDelay });
+    Object.assign(this, {
+      dataDir,
+      onEvent,
+      openExternal,
+      turnTimeout,
+      idleDelay,
+      recoveryDelay,
+      diagnostics,
+    });
     this.client =
       client ||
       new CodexClient({
         home: path.join(dataDir, 'agent', 'codex'),
         cwd: path.join(dataDir, 'agent', 'sandbox'),
         version,
+        diagnostics,
       });
     this.cwd = this.client.cwd || path.join(dataDir, 'agent', 'sandbox');
     this.codexClient = this.client;
@@ -126,6 +136,7 @@ class AgentService {
     this.active = null;
     this.connecting = null;
     this.loginId = null;
+    this.loginURL = null;
     this.hints = new AgentHints({
       dataDir,
       getClient: () => this.client,
@@ -144,9 +155,16 @@ class AgentService {
       // not a network error and must not race a newly mounted panel.
       if (this.closing || this.closed) return;
       this.hints.cancel();
+      this.loginId = null;
+      this.loginURL = null;
       this.publishConnection({ ...this.connection, phase: 'error', message: error.message });
       void this.completeFailure();
-      if (this.leases.size && this.intent && !this.recoveryAttempted) {
+      if (
+        this.leases.size &&
+        this.intent &&
+        !this.recoveryAttempted &&
+        !['AGENT_MISSING', 'AGENT_STARTUP', 'AGENT_PROTOCOL'].includes(error.code)
+      ) {
         this.recoveryAttempted = true;
         this.recoveryTimer = setTimeout(() => {
           this.recoveryTimer = null;
@@ -220,7 +238,17 @@ class AgentService {
     }
   }
   publishConnection(value) {
+    if (value.phase !== 'login') {
+      delete value.loginURL;
+      delete value.waiting;
+    }
     this.connection = { ...value, provider: this.provider, revision: ++this.connectionRevision };
+    this.diagnostics?.record('connection', {
+      stage: value.phase,
+      provider: this.provider,
+      waiting: !!value.waiting,
+      hasAccount: !!value.account,
+    });
     this.onEvent({ type: 'connection', connection: this.status() });
   }
   async loadIntent() {
@@ -356,7 +384,10 @@ class AgentService {
     if (this.closing) await this.closing;
     if (this.closed) return this.status();
     if (!this.intent) return this.status();
-    if (this.connection.phase === 'ready' && (this.client.child || this.client.started))
+    if (
+      (this.connection.phase === 'ready' || (this.connection.phase === 'login' && this.loginId)) &&
+      (this.client.child || this.client.started)
+    )
       return this.status();
     if (this.connecting) return this.connecting;
     this.connecting = this.connectNow().finally(() => {
@@ -371,6 +402,11 @@ class AgentService {
       await this.client.start();
       await this.refreshAccount();
     } catch (error) {
+      this.diagnostics?.record('connection', {
+        stage: 'error',
+        provider: this.provider,
+        code: error.code,
+      });
       this.publishConnection({
         ...this.connection,
         phase: error.code === 'AGENT_MISSING' ? 'missing' : 'error',
@@ -417,25 +453,67 @@ class AgentService {
     if (this.provider === 'api') throw fail('API 接入不需要订阅登录，请在设置中填写凭据。');
     if (!this.client.child && !this.client.started) await this.connect();
     if (['missing', 'error'].includes(this.connection.phase)) return this.status();
-    if (this.loginId) await this.client.request('account/login/cancel', { loginId: this.loginId });
+    if (this.loginId && this.loginURL) {
+      await this.openLoginPage();
+      return this.status();
+    }
     const result = await this.client.request('account/login/start', {
       type: 'chatgpt',
       useHostedLoginSuccessPage: true,
       appBrand: 'chatgpt',
     });
+    const loginURL = authURL(result.authUrl);
+    if (typeof result.loginId !== 'string' || !result.loginId || result.loginId.length > 200)
+      throw fail('Codex 登录回应不完整，请更新 Codex CLI 后重试。', 'AGENT_PROTOCOL');
     this.loginId = result.loginId;
-    await this.openExternal(authURL(result.authUrl));
+    this.loginURL = loginURL;
     this.publishConnection({
       phase: 'login',
       models: [],
       waiting: true,
+      loginURL: this.loginURL,
       message: '请在浏览器完成登录，完成后会自动连接。',
     });
+    this.diagnostics?.record('login', { stage: 'start', provider: this.provider });
+    await this.openLoginPage();
     return this.status();
+  }
+  async openLoginPage() {
+    if (!this.loginURL || !this.loginId) return;
+    const id = this.loginId,
+      url = this.loginURL;
+    try {
+      await this.openExternal(url);
+      this.diagnostics?.record('login', { stage: 'browser', success: true });
+      if (this.loginId === id)
+        this.publishConnection({
+          phase: 'login',
+          models: [],
+          waiting: true,
+          loginURL: url,
+          message: '请在浏览器完成登录，完成后会自动连接。',
+        });
+    } catch {
+      this.diagnostics?.record('login', {
+        stage: 'browser',
+        success: false,
+        reason: 'browser-open-failed',
+      });
+      if (this.loginId === id)
+        this.publishConnection({
+          phase: 'login',
+          models: [],
+          waiting: true,
+          loginURL: url,
+          message: '浏览器未能打开，请点击打开登录页或复制登录链接。',
+        });
+    }
   }
   async cancelLogin() {
     if (this.loginId) await this.client.request('account/login/cancel', { loginId: this.loginId });
     this.loginId = null;
+    this.loginURL = null;
+    this.diagnostics?.record('login', { stage: 'cancel' });
     await this.refreshAccount();
     this.scheduleIdle();
     return this.status();
@@ -550,6 +628,7 @@ class AgentService {
       timeoutBudget: activityTimeout(input.effort ?? model.effort, this.turnTimeout),
     };
     this.active = task;
+    this.diagnostics?.record('agent-turn', { stage: 'start', provider: this.provider });
     this.emitSession(session);
     try {
       await this.persist(session);
@@ -734,6 +813,8 @@ class AgentService {
     if (method === 'account/login/completed') {
       if (params.loginId !== this.loginId) return;
       this.loginId = null;
+      this.loginURL = null;
+      this.diagnostics?.record('login', { stage: 'complete', success: !!params.success });
       if (params.success) await this.refreshAccount();
       else this.publishConnection({ phase: 'login', models: [], message: '登录未完成，请重试。' });
       this.scheduleIdle();
@@ -958,6 +1039,11 @@ class AgentService {
   }
   async repair(task, error) {
     task.repairs++;
+    this.diagnostics?.record('agent-turn', {
+      stage: 'repair',
+      count: task.repairs,
+      code: error.code,
+    });
     task.message.repairing = true;
     task.final = '';
     task.message.text = '';
@@ -1053,6 +1139,12 @@ class AgentService {
       }
     task.session.running = false;
     task.message.status = status;
+    this.diagnostics?.record('agent-turn', {
+      stage: status === 'completed' ? 'complete' : status,
+      provider: this.provider,
+      count: task.repairs,
+      elapsedMs: Math.round(Date.now() - task.startedAt),
+    });
     task.message.finishedAt = Date.now();
     if (task.stopReason) task.message.stopReason = task.stopReason;
     delete task.message.repairing;
@@ -1135,6 +1227,8 @@ class AgentService {
     if (this.closing) return this.closing;
     this.closing = Promise.resolve()
       .then(async () => {
+        this.loginId = null;
+        this.loginURL = null;
         if (this.client.close) await this.client.close();
         else this.client.stop();
       })

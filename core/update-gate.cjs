@@ -1,4 +1,5 @@
 const WRITES = new Set([
+  'diagnostics-export',
   'agent-send',
   'agent-configure',
   'agent-login',

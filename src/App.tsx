@@ -2950,6 +2950,16 @@ export default function App() {
               {t('文档以纯文本保存，历史与恢复草稿保存在应用数据目录。')}
               <br />
               <button onClick={() => setModal('updates')}>{t('检查更新…')}</button>
+              <span> · </span>
+              <button
+                onClick={() =>
+                  guarded(async () => {
+                    if (await bridge.exportDiagnostics()) notify(t('诊断信息已导出。'));
+                  })
+                }
+              >
+                {t('导出诊断信息')}
+              </button>
             </div>
           </div>
         </Modal>

@@ -180,6 +180,7 @@ export interface AgentConnection {
   revision?: number;
   phase: 'idle' | 'connecting' | 'ready' | 'login' | 'missing' | 'error';
   waiting?: boolean;
+  loginURL?: string;
   message?: string;
   account?: { email: string | null; plan: string };
   models: {
@@ -361,6 +362,7 @@ export interface Bridge {
   watchDocuments(paths: string[]): Promise<void>;
   quickOpen(root: string, query: string): Promise<Array<{ path: string; name: string }>>;
   read(path: string): Promise<FileSnapshot>;
+  exportDiagnostics(): Promise<string | null>;
   contextMenu(input: {
     kind: 'document' | 'file' | 'tab' | 'text';
     path?: string;

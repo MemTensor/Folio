@@ -1,38 +1,24 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
-const path = require('node:path');
-const os = require('node:os');
 const { EventEmitter } = require('node:events');
+const { findCodex, resolveCodexRuntime, runtimePATH } = require('./codex-runtime.cjs');
 
 const MAX_FRAME = 2 * 1024 * 1024;
 const failure = (message, code = 'AGENT_CONNECTION') => Object.assign(Error(message), { code });
-async function findCodex() {
-  const names = process.platform === 'win32' ? ['codex.exe', 'codex.cmd'] : ['codex'];
-  const directories = [
-    ...new Set([
-      ...(process.env.PATH || '').split(path.delimiter),
-      '/opt/homebrew/bin',
-      '/usr/local/bin',
-      path.join(os.homedir(), '.local/bin'),
-      path.join(os.homedir(), '.npm-global/bin'),
-    ]),
-  ].filter((entry) => path.isAbsolute(entry));
-  for (const directory of directories)
-    for (const name of names) {
-      const file = path.join(directory, name);
-      try {
-        await fs.access(file, fs.constants.X_OK);
-        return file;
-      } catch {}
-    }
-  throw failure('尚未找到 Codex，请先安装 Codex CLI，然后重新连接。', 'AGENT_MISSING');
-}
 
 /** Official app-server JSONL transport, started only on explicit connection. */
 class CodexClient extends EventEmitter {
-  constructor({ home, cwd, version, executable, spawnProcess = spawn, timeout = 30000 }) {
+  constructor({
+    home,
+    cwd,
+    version,
+    executable,
+    spawnProcess = spawn,
+    timeout = 30000,
+    diagnostics,
+  }) {
     super();
-    Object.assign(this, { home, cwd, version, executable, spawnProcess, timeout });
+    Object.assign(this, { home, cwd, version, executable, spawnProcess, timeout, diagnostics });
     this.pending = new Map();
     this.counter = 0;
     this.buffer = '';
@@ -51,20 +37,16 @@ class CodexClient extends EventEmitter {
   async launch() {
     await fs.mkdir(this.home, { recursive: true, mode: 0o700 });
     await fs.mkdir(this.cwd, { recursive: true, mode: 0o700 });
-    let executable = this.executable || (await findCodex());
-    // npm installs a JS launcher. Use its bundled native binary on macOS so
-    // the restricted runtime need not read a separate Node installation.
-    if (process.platform === 'darwin') {
-      try {
-        const real = await fs.realpath(executable);
-        if (path.basename(real) === 'codex.js') {
-          const triple = process.arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin';
-          const native = path.resolve(path.dirname(real), '../vendor', triple, 'codex/codex');
-          await fs.access(native, fs.constants.X_OK);
-          executable = native;
-        }
-      } catch {}
-    }
+    const found = this.executable || (await findCodex());
+    const runtime = await resolveCodexRuntime(found);
+    const executable = runtime.executable;
+    this.runtime = runtime;
+    this.protocolReady = false;
+    this.diagnostics?.record('codex-runtime', {
+      stage: 'start',
+      runtimeSource: runtime.source,
+      runtimeVersion: runtime.version,
+    });
     // Isolated config/auth prevents importing other harnesses' plugins, hooks,
     // project instructions, or an inherited API key with a different bill.
     const env = { CODEX_HOME: this.home };
@@ -85,6 +67,7 @@ class CodexClient extends EventEmitter {
       'SSL_CERT_DIR',
     ])
       if (typeof process.env[key] === 'string') env[key] = process.env[key];
+    env.PATH = runtimePATH(found, env);
     const config = {
       model_provider: 'openai',
       web_search: 'disabled',
@@ -132,25 +115,60 @@ class CodexClient extends EventEmitter {
       windowsHide: true,
     });
     this.child = child;
+    let startupReason;
+    const disconnected = () =>
+      failure(
+        startupReason === 'node-missing'
+          ? 'Codex 启动器未找到 Node，请重新安装 Codex CLI 后连接。'
+          : startupReason === 'incompatible'
+            ? 'Codex 启动配置不兼容，请更新 Codex CLI 后重试。'
+            : this.protocolReady
+              ? 'Codex 连接已断开，请重新连接。'
+              : 'Codex 在连接完成前退出，请更新 Codex CLI 或导出诊断信息。',
+        this.protocolReady ? 'AGENT_CONNECTION' : 'AGENT_STARTUP',
+      );
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
       if (this.child === child) this.read(chunk);
     });
     child.stdin.on('error', () => {
-      if (this.child === child) this.stop(failure('Codex 连接已断开，请重新连接。'));
+      if (this.child === child) this.stop(disconnected());
     });
-    // stderr may include credentials, file contents, or internal diagnostics.
-    child.stderr.resume();
-    child.on('error', () => {
-      if (this.child === child) this.stop(failure('Codex 未能启动，请检查安装后重新连接。'));
+    // Recognize a few startup categories without retaining or logging stderr.
+    child.stderr.on('data', (chunk) => {
+      if (this.child !== child || this.protocolReady) return;
+      const text = String(chunk).slice(0, 8192);
+      if (/env:.*node.*(?:No such file|not found)/i.test(text)) startupReason = 'node-missing';
+      else if (
+        /error loading config|unknown variant|invalid type|unexpected argument|unrecognized subcommand/i.test(
+          text,
+        )
+      )
+        startupReason = 'incompatible';
     });
-    child.on('exit', () => {
-      if (this.child === child) this.stop(failure('Codex 连接已断开，请重新连接。'));
+    child.on('error', (error) => {
+      if (this.child !== child) return;
+      this.diagnostics?.record('codex-runtime', { stage: 'error', code: error.code });
+      this.stop(failure('Codex 未能启动，请检查安装后重新连接。'));
     });
-    await this.request('initialize', {
+    child.on('exit', (exitCode, signal) => {
+      if (this.child !== child) return;
+      this.diagnostics?.record('codex-exit', {
+        stage: this.protocolReady ? 'ready' : 'start',
+        exitCode,
+        signal,
+        reason: startupReason,
+      });
+      this.stop(disconnected());
+    });
+    const initialized = await this.request('initialize', {
       clientInfo: { name: 'folio', title: 'Folio', version: this.version },
       capabilities: { experimentalApi: true },
     });
+    const runtimeVersion = /codex[^/\s]*\/(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?)/.exec(
+      initialized?.userAgent || '',
+    )?.[1];
+    this.diagnostics?.record('codex-protocol', { stage: 'initialized', runtimeVersion });
     this.write({ method: 'initialized' });
     const effective = await this.request('config/read', { includeLayers: false });
     const profile = effective.config?.permissions?.['folio-documents'];
@@ -165,6 +183,8 @@ class CodexClient extends EventEmitter {
         'Codex 文档权限配置不可用，请更新 Codex CLI 或检查本机权限设置。',
         'AGENT_PROTOCOL',
       );
+    this.protocolReady = true;
+    this.diagnostics?.record('codex-protocol', { stage: 'ready', success: true });
   }
   write(frame) {
     if (!this.child || this.child.killed) throw failure('Codex 连接已断开，请重新连接。');
@@ -175,10 +195,15 @@ class CodexClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
+        this.diagnostics?.record('codex-protocol', {
+          stage: 'error',
+          operation: method,
+          code: 'ETIMEDOUT',
+        });
         reject(failure('Codex 响应超时，请重新连接后重试。'));
       }, this.timeout);
       timer.unref?.();
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { resolve, reject, timer, method });
       try {
         this.write({ id, method, params });
       } catch (error) {
@@ -227,13 +252,20 @@ class CodexClient extends EventEmitter {
         if (!call) continue;
         clearTimeout(call.timer);
         this.pending.delete(frame.id);
-        if (frame.error)
+        if (frame.error) {
+          this.diagnostics?.record('codex-protocol', {
+            stage: 'error',
+            operation: call.method,
+            code: [-32600, -32601].includes(frame.error.code)
+              ? 'AGENT_PROTOCOL'
+              : 'AGENT_CONNECTION',
+          });
           call.reject(
             [-32600, -32601].includes(frame.error.code)
               ? failure('Codex 工具协议不兼容，请更新 Codex CLI 后重试。', 'AGENT_PROTOCOL')
               : failure('Codex 未能完成请求，请检查登录状态后重试。'),
           );
-        else call.resolve(frame.result);
+        } else call.resolve(frame.result);
       } else if (typeof frame.method === 'string')
         this.emit('notification', frame.method, frame.params || {});
     }

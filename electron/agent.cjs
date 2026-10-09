@@ -14,6 +14,7 @@ function registerAgent({
   listDocuments,
   getPreview,
   contextEnabled,
+  diagnostics,
 }) {
   const service =
     agentService ||
@@ -23,6 +24,7 @@ function registerAgent({
       onEvent,
       openExternal,
       contextEnabled,
+      diagnostics,
       settings: new (require('../core/agent-settings.cjs').AgentSettings)(dataDir, {
         encrypt,
         decrypt,

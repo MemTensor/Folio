@@ -1078,5 +1078,18 @@
   "粘贴为纯文本": "Paste as plain text",
   "全选": "Select all",
   "右键菜单请求无效。": "Invalid context menu request.",
-  "文档已变化，请重新打开右键菜单。": "The document changed. Open the context menu again."
+  "文档已变化，请重新打开右键菜单。": "The document changed. Open the context menu again.",
+  "Codex 安装缺少当前 Mac 的原生程序，请重新安装 Codex CLI 后连接。": "The native Codex executable for this Mac is missing. Reinstall Codex CLI and connect again.",
+  "Codex 启动器未找到 Node，请重新安装 Codex CLI 后连接。": "The Codex launcher could not find Node. Reinstall Codex CLI and connect again.",
+  "Codex 启动配置不兼容，请更新 Codex CLI 后重试。": "This Codex version cannot use the launch configuration. Update Codex CLI and retry.",
+  "Codex 在连接完成前退出，请更新 Codex CLI 或导出诊断信息。": "Codex exited before connecting. Update Codex CLI or export diagnostics.",
+  "Codex 登录回应不完整，请更新 Codex CLI 后重试。": "Codex returned an incomplete sign-in response. Update Codex CLI and retry.",
+  "浏览器未能打开，请点击打开登录页或复制登录链接。": "The browser did not open. Open the sign-in page or copy the sign-in link.",
+  "打开登录页": "Open sign-in page",
+  "复制登录链接": "Copy sign-in link",
+  "已复制登录链接。": "Sign-in link copied.",
+  "导出诊断信息": "Export diagnostics",
+  "诊断信息已导出。": "Diagnostics exported.",
+  "诊断信息仅含运行事件，日志最多约 1 MB；不包含正文、对话或凭据。": "Diagnostics contain runtime events only, capped at about 1 MB. Document text, conversations and credentials are excluded.",
+  "找到的是桌面应用入口，请安装 Codex CLI 后重新连接。": "This entry launches a desktop app. Install Codex CLI and connect again."
 }

@@ -4,6 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { EventEmitter } = require('node:events');
 const { AgentService } = require('../core/agent-service.cjs');
+const { Diagnostics } = require('../core/diagnostics.cjs');
 const { AgentSettings } = require('../core/agent-settings.cjs');
 const { CompatibleClient } = require('../core/compatible-client.cjs');
 const { AgentDocuments } = require('../core/agent-documents.cjs');
@@ -291,7 +292,12 @@ async function run() {
       );
     },
   });
+  const diagnostics = new Diagnostics(path.join(temporary, 'diagnostic-state'), {
+    version: '0.5.0-beta.16',
+  });
+  diagnostics.record('app-start');
   const agent = new AgentService({
+    diagnostics,
     dataDir: path.join(temporary, 'agent-data'),
     settings: agentSettings,
     apiClient,
@@ -320,6 +326,14 @@ async function run() {
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
   const handlers = {
+    'diagnostics-export': async () => {
+      const snapshot = await diagnostics.snapshot();
+      if (snapshot.includes(marker) || snapshot.includes('generated-api-key'))
+        throw Error('Document or credential leaked into diagnostics.');
+      const target = path.join(temporary, 'exported-diagnostics.json');
+      await fs.writeFile(target, snapshot);
+      return target;
+    },
     'context-menu': (input) => {
       if (input.kind !== 'text' && input.path !== file) throw Error('Unexpected context file.');
       let result = null;

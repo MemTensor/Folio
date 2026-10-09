@@ -68,7 +68,25 @@ async function run() {
     const session = await completed;
     assert.equal(session.messages.at(-1).status, 'completed');
     assert.equal(session.messages.at(-1).edits[0].after, 'Revised sentence.');
-    console.log(JSON.stringify({ ok: true, asarAgentService: true, sourceValidation: true }));
+    const { Diagnostics } = require(
+      path.join(bundle, 'Contents/Resources/app.asar/core/diagnostics.cjs'),
+    );
+    const diagnostics = new Diagnostics(temporary, { version: '0.5.0-beta.16' });
+    diagnostics.record('login', {
+      stage: 'start',
+      authURL: 'PRIVATE_AUTH_URL',
+      content: 'PRIVATE_DOCUMENT',
+    });
+    const report = await diagnostics.snapshot();
+    assert.doesNotMatch(report, /PRIVATE_AUTH_URL|PRIVATE_DOCUMENT/);
+    console.log(
+      JSON.stringify({
+        ok: true,
+        asarAgentService: true,
+        sourceValidation: true,
+        boundedDiagnostics: true,
+      }),
+    );
   } finally {
     await service?.close();
     await fs.rm(temporary, { recursive: true, force: true });

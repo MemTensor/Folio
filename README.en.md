@@ -4,34 +4,109 @@
 
 <h1 align="center">Folio</h1>
 
-<p align="center"><strong>A Markdown workspace for people and AI Agents</strong></p>
+<p align="center"><strong>People and Agents, working on the same document</strong></p>
 
-<p align="center">Read, find and edit documents across projects. Work with Claude Code and Codex on the same files.</p>
+<p align="center">Read, organize and edit Markdown across projects. Connect everyday writing with Agent collaboration.</p>
 
-<p align="center"><a href="README.md">简体中文</a> · <a href="#get-started">Get started</a> · <a href="#work-with-agents">Agents</a> · <a href="docs/开发指南.md">Development</a></p>
+<p align="center"><a href="#get-started">Get started</a> · <a href="#document-workspace">Workspace</a> · <a href="#an-agent-beside-your-document">Agent</a> · <a href="#sharing-sync-and-project-memory">Sharing</a> · <a href="#documentation-and-development">Docs</a> · <a href="README.md">简体中文</a></p>
 
-![Folio: project tabs, formulas and tables](docs/images/workspace.png)
+![Folio workspace: project documents, formulas and tables](docs/images/workspace.png)
 
-## Your documents, in one place
+## Document workspace
 
-Plans, technical proposals, experiment records and project notes accumulate across folders as people and Agents work together. Folio gives these documents a common place to read, search, edit and review. Original files remain ordinary Markdown in their existing folders, ready for Git and other tools.
+Plans, experiment records, proposals and project notes come from people, Claude Code, Codex, and their ongoing collaboration. Folio makes these scattered files a place to read, search and continue writing.
 
-- **Find and resume.** Pin projects, reopen recent documents, search across registered projects and keep several project tabs open. The document list puts files first, with filtering, sorting and folder context.
-- **Read technical content.** Switch between writing, source and reading in one editor. Preview LaTeX, Mermaid, images and tables; export PDF, HTML or Word. Choose Chinese or English, with themes and focus options.
-- **Work on the same files.** External changes arrive in open tabs. Unsaved human edits are retained, differences can be reviewed and merged, and drafts and history survive restarts.
-- **Keep cloud features optional.** Local reading, editing and search work without a model account. Agent assistance, MemOS, DingTalk and project iCloud sync are configured separately.
+Original documents stay ordinary Markdown, with existing folders, relative assets and Git workflows. Use Folio to edit, review changes and recover earlier work.
+
+| Capability | Experience |
+| --- | --- |
+| Across projects | Pinned projects, recent documents and project tabs; filter and sort documents with folder context |
+| Find sources | Search file names and document text, filter by project and distinguish same-name files |
+| Read and write | Writing, source and reading in one editor; themes, focus and typewriter modes |
+| Technical content | Preview and edit LaTeX, Mermaid, images and tables; export PDF, HTML or Word |
+| File collaboration | Receive external changes, retain unsaved drafts, compare and merge edits, restore tabs and history |
+| Native context menus | Text formatting, formula / diagram / table editors, document paths, rename, save and close tabs |
+
+Optional project discovery reads local Codex / Claude Code project records. Files remain in their original locations; removing a library entry retains the original documents.
 
 ## Get started
 
-### Desktop app
+**[Download v0.5.0-beta.16 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.16/Folio-0.5.0-beta.16-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
 
-[Download v0.5.0-beta.15 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.15/Folio-0.5.0-beta.15-arm64-mac.zip). Unzip and move `Folio.app` to Applications.
+Unzip and move `Folio.app` to Applications, then open a Markdown file or project folder.
 
-Source and installation packages are hosted in MemTensor/Folio and require repository access. Packages do not yet have Developer ID signing or Apple notarization. The current source repository is **MemTensor/Folio**, is private, and has no open-source license grant.
+1. **Find your work:** resume a recent document or add and pin a project.
+2. **Read and edit:** click a paragraph to write; open dedicated formula, diagram and table editors.
+3. **Collaborate:** ask or request edits in Agent, then review changes before applying them.
 
-### Run from source
+Local reading, editing and search work offline without a model account. The interface supports Simplified Chinese and English.
 
-Requires macOS, Node.js 22.13+ and npm, with access to this repository.
+This is a private test release requiring access to [MemTensor/Folio](https://github.com/MemTensor/Folio). Developer ID signing and Apple notarization are pending. The project is `UNLICENSED` and has no open-source license grant.
+
+Open **Check for updates** from the Folio menu or writing settings to review, download and restart while retaining drafts. Private updates use your local GitHub CLI sign-in. See [updates](docs/更新说明.md).
+
+## An Agent beside your document
+
+![Folio Agent: a document conversation with reviewable edits](docs/images/agent.png)
+
+Ask a question or describe an edit in one input. Context can be the current draft, selected text or reference documents you add.
+
+- **Understand content:** summarize, explain and check structure or reasoning; suggestions are grounded in the document.
+- **Find evidence:** look up bounded excerpts from the same project and open the cited sources.
+- **Check rendering:** models with image input can request a read-only preview of the visible formulas, diagrams and tables.
+- **Review edits:** compare proposals with the source and choose what to accept, with a version backup and undo.
+- **Continue a request:** invalid output is returned to the model for repair; interrupted instructions remain available for retry.
+
+Choose the model and reasoning effort in the panel. Automatic lookup stays within the current project. Tools provide document lookup, reading and visible previews; edits go through review before reaching the editor.
+
+### Choose a connection
+
+| Connection | Setup |
+| --- | --- |
+| ChatGPT subscription | Install [Codex CLI](https://learn.chatgpt.com/docs/cli), connect in Agent settings and complete the official sign-in page using your account's Codex access |
+| OpenAI-compatible API | Provide the service URL, your API Key and model name; usage is billed by that service |
+
+If the browser does not open, reopen or copy the sign-in link. Connection and credential management stay in Agent settings. See [Agent assistance](docs/Agent文档助手.md).
+
+> Screenshots use fictional documents and demonstration conversations. Suggestions and chat send the selected content to your configured model service. Visible previews are sent only when the model calls the preview tool.
+
+### Work with Claude Code and Codex
+
+The independent **CLI, skill and plugin** let external Agents find documents, read versions and sections, and submit version-checked edits while the desktop app is closed.
+
+Try these from the source directory:
+
+```bash
+./bin/folio search "公式" --workspace ./examples --json
+./bin/folio read "公式、图与表.md" --workspace ./examples --json
+./bin/folio library add ./examples --json
+./bin/folio library search "实验" --json
+```
+
+Writes require the version returned by a read. Later changes require a fresh read. Workspace reads and searches do not register projects automatically; use `library add` for ongoing retrieval. The app includes a CLI runtime. [Integration guide](integrations/README.md) covers installation and the protocol.
+
+## Sharing, sync and project memory
+
+| Feature | Scope |
+| --- | --- |
+| DingTalk online documents (experimental) | Publish or update through the logged-in local `dws` CLI with cloud version checks; text and tables are editable, formulas and Mermaid render as images |
+| iCloud Drive | Opt in per project for Markdown and referenced local attachments smaller than 100 MB each; conflicting changes require review |
+| MemOS (optional) | Configure your own API Key and a project knowledge base; Agents maintain document navigation through the CLI / skill |
+
+MemOS helps later tasks find the source documents. Local Markdown remains the source. See [DingTalk](docs/钉钉集成说明.md), [projects and sync](docs/项目与同步.md) and [Agent integration](integrations/README.md).
+
+## Documentation and development
+
+| Guide | Contents |
+| --- | --- |
+| [User guide](docs/使用指南.md) | Documents, writing, technical content, context menus, review, export and shortcuts |
+| [Agent assistance](docs/Agent文档助手.md) | Connections, context, effort, previews and review |
+| [Agent integration](integrations/README.md) | CLI, Codex / Claude Code skill and plugin |
+| [Architecture and data boundaries](docs/架构与数据边界.md) | Code entry points, storage and cloud transfers |
+| [Development guide](docs/开发指南.md) | Setup, checks, packaging and releases |
+| [Third-party notices](THIRD_PARTY_NOTICES.md) | Dependencies and licenses |
+
+Run from source on macOS with Node.js 22.13+ and npm:
 
 ```bash
 git clone https://github.com/MemTensor/Folio.git
@@ -41,45 +116,12 @@ node node_modules/electron/install.js
 npm run desktop
 ```
 
-Open a Markdown file or project folder. Click a paragraph to write, use the document list to find files, and review external updates from the toolbar. See the [user guide](docs/使用指南.md), [development guide](docs/开发指南.md) and [changelog](CHANGELOG.md).
+Use `npm run check`, `npm run pack` and `npm run dist` to validate and build. Read [contributing](CONTRIBUTING.md) and [security](SECURITY.md) before submitting changes.
 
-## Work with Agents
-
-Open **Agent** beside a document to use a ChatGPT subscription through the local Codex app-server, or configure an OpenAI-compatible Chat Completions API. Ask questions and request edits from one input. Choose the model and its supported reasoning effort.
-
-The current draft or selected text is the context. You may add reference documents; when working with the whole document, the Agent can find and read bounded excerpts from the same project. It can request a read-only image of the visible document region to check rendering. Shell access and direct file writes are unavailable.
-
-Invalid edits are sent back to the model for a limited repair attempt. Valid proposals go through a diff review before you apply them, with version checks, a backup and undo support. Interrupted requests retain their instructions and can be retried. See [Agent assistance](docs/Agent文档助手.md) and [architecture and data boundaries](docs/架构与数据边界.md).
-
-### Independent CLI, skill and plugin
-
-```bash
-./bin/folio search "formula" --workspace ./examples --json
-./bin/folio read "公式、图与表.md" --workspace ./examples --json
-./bin/folio library add ./examples --json
-./bin/folio library search "experiment" --json
-```
-
-The CLI works while the desktop app is closed. Writes require the version returned by a read, protecting later changes. Reading or searching a workspace does not automatically register it in the library. [Integration guide](integrations/README.md) covers the CLI and the Codex / Claude Code skill and plugin.
-
-## Optional sharing and memory
-
-- **DingTalk:** confirm publication as an online document through the logged-in local `dws` CLI. Text and tables remain editable; formulas and Mermaid render as images. Version checks protect cloud edits. [Guide](docs/钉钉集成说明.md).
-- **MemOS:** configure your own API Key and select or create a project knowledge base. Agents use the CLI / skill to maintain document navigation; local Markdown remains the source.
-- **iCloud Drive:** opt in per project for Markdown and referenced local attachments smaller than 100 MB each. Conflicting changes require review. [Projects and sync](docs/项目与同步.md).
-
-## Development
-
-```bash
-npm run check   # tests, types, production build and native desktop scenarios
-npm run pack    # app bundle and packaged worker / CLI checks
-npm run dist    # distribution ZIP
-```
-
-Use generated documents and isolated application data. Read [contributing](CONTRIBUTING.md), [security](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md) before submitting changes.
+For connection or operation problems, **export diagnostics** from writing settings or Agent settings. Local logs are capped at about 1 MB and contain runtime events and error categories, excluding document text, conversations, credentials and sign-in links.
 
 ## Roadmap
 
-- Multiple windows and reading-position restoration.
-- Document links, backlinks and related-document navigation.
-- Signed distribution packages and additional platforms.
+- Multiple windows and reading-position restoration across sessions.
+- Document references, backlinks and related-document navigation.
+- Developer ID signing, notarization and additional platforms.

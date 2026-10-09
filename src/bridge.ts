@@ -78,6 +78,7 @@ function demoProjects(): ProjectOverview {
 const demo: Bridge = {
   desktop: false,
   contextMenu: async () => null,
+  exportDiagnostics: unavailable,
   agentStatus: async () => ({ phase: 'idle', models: [] }),
   agentContext: async () => {},
   agentHints: async ({ path }) => ({ key: '', path, phase: 'unavailable', summary: '', hints: [] }),
@@ -309,6 +310,7 @@ const demo: Bridge = {
 };
 export const bridgeActivity = createBridgeActivity();
 const writeMethods = new Set<keyof Bridge>([
+  'exportDiagnostics',
   'agentSend',
   'agentConfigure',
   'agentLogin',
