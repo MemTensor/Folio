@@ -85,7 +85,7 @@
     "appId": "io.folio.markdown",
     "productName": "Folio",
     "directories": {
-      "output": "release/v0.5.0-beta.17"
+      "output": "release/v0.5.0-beta.18"
     },
     "files": [
       "dist/**/*",
