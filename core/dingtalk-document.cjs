@@ -1,12 +1,13 @@
 const fs = require('node:fs/promises'),
   path = require('node:path');
 const MarkdownIt = require('markdown-it');
+const { cjkEmphasis } = require('./markdown-emphasis.mjs');
 const { imageSize } = require('image-size');
 const { svgPng } = require('./svg-png.cjs');
 const { digest } = require('./state.cjs');
 const { DingTalkError } = require('./dingtalk-cli.cjs');
 
-const md = new MarkdownIt({ html: true, linkify: true });
+const md = new MarkdownIt({ html: true, linkify: true }).use(cjkEmphasis);
 const fenceLanguage = (info) =>
   md.utils
     .unescapeAll(String(info || ''))

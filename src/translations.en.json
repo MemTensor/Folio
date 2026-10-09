@@ -27,7 +27,6 @@
   "Agent 已尝试重新对齐原文，但仍未能生成可审阅的修改。": "The agent tried to align its changes with the source, but could not produce reviewable edits.",
   "Agent 已尝试整理修改，但仍有重叠内容，尚未应用。": "The agent tried to organize its changes, but they still overlap. Nothing was applied.",
   "Agent 已尝试修正，但回复仍不完整，尚未应用修改。": "The agent tried to correct its response, but it is still incomplete. Nothing was applied.",
-
   "参考了 {count} 份项目文档": "Referenced {count} project {count|document|documents}",
   "API 回复未完成，请缩小范围后重试。": "The API reply did not finish. Narrow the request and try again.",
   "API 工具调用格式不兼容，请重试。": "The API tool-call format is incompatible. Try again.",
@@ -1063,5 +1062,7 @@
   "更新文档建议": "Refresh document suggestions",
   "文档建议模型": "Document suggestion model",
   "轻量模型名称": "Lightweight model name",
-  "建议使用轻量模型生成；留空时不会调用更贵的模型。": "Use a lightweight model for suggestions. Leaving this blank will not call a more expensive model."
+  "建议使用轻量模型生成；留空时不会调用更贵的模型。": "Use a lightweight model for suggestions. Leaving this blank will not call a more expensive model.",
+  "默认·{level}": "Default · {level}",
+  "服务默认": "Service default"
 }

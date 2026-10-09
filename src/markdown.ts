@@ -11,6 +11,7 @@ import katex from 'katex';
 import hljs from 'highlight.js';
 import { imageURL } from './image-url.mjs';
 import { annotateTaskMarkers } from './task-markers.mjs';
+import { cjkEmphasis } from '../core/markdown-emphasis.mjs';
 export { imageURL } from './image-url.mjs';
 export interface RenderEnv {
   path?: string;
@@ -42,6 +43,7 @@ export const parser = new MarkdownIt({
     return `<pre class="code-preview" data-language="${escapeHTML(lang || 'text')}"><code>${escapeHTML(code)}</code></pre>`;
   },
 })
+  .use(cjkEmphasis)
   .use(footnote)
   .use(mark)
   .use(sub)

@@ -78,6 +78,17 @@ async function verifyAgentPanel(window, original, capturePath, language) {
   assert.equal(layout.display, 'flex');
   await clickLabel(labels.connect);
   await wait(() => !!document.querySelector('.agent-provider-button .agent-dot.ready'));
+  assert.equal(
+    await evaluate(() =>
+      document.querySelector('.agent-effort').selectedOptions[0].textContent.trim(),
+    ),
+    en ? 'Default · Medium' : '默认·中',
+  );
+  assert(
+    await evaluate(
+      () => document.querySelector('.agent-effort').getBoundingClientRect().width <= 112,
+    ),
+  );
   await wait(() => !!document.querySelector('.agent-hint-loading'));
   assert.equal(
     await evaluate(() => document.querySelector('.agent-composer textarea').disabled),
@@ -163,6 +174,11 @@ async function verifyAgentPanel(window, original, capturePath, language) {
   });
   await pause();
   assert.equal(await evaluate(() => !!document.querySelector('.agent-mode')), false);
+  assert(
+    await evaluate(
+      () => document.querySelector('.agent-effort').getBoundingClientRect().width < 70,
+    ),
+  );
   await clickLabel(labels.send);
   await wait(() => !!document.querySelector('.agent-proposal'));
   await wait(() => !!document.querySelector('.agent-sources'));

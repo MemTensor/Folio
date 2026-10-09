@@ -68,7 +68,9 @@ const content =
           ' follows.\n'
         : scenario === 'agent'
           ? '\n$$a^2+b^2=c^2$$\n\n| Ratio | Score |\n| --- | --- |\n| A | 0.7 |\n'
-          : '');
+          : scenario === 'normal'
+            ? '\n**问题一：训练数据扩展性不足。 **随着训练推进。\n\n中文**“重点”**接正文。\n'
+            : '');
 const errors = [],
   unexpectedIPC = [],
   calls = {};
@@ -135,6 +137,7 @@ async function run() {
             model: 'fixture-model',
             displayName: 'Fixture model',
             isDefault: true,
+            defaultReasoningEffort: 'medium',
             supportedReasoningEfforts: ['low', 'medium', 'high'].map((reasoningEffort) => ({
               reasoningEffort,
             })),
@@ -143,6 +146,7 @@ async function run() {
             model: 'fixture-precise',
             displayName: 'Fixture precise',
             isDefault: false,
+            defaultReasoningEffort: 'low',
             supportedReasoningEfforts: ['low', 'high'].map((reasoningEffort) => ({
               reasoningEffort,
             })),
@@ -313,6 +317,12 @@ async function run() {
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
   const handlers = {
+    'accept-open': (p) => {
+      if (p !== workspace) throw Error('Unexpected Finder project.');
+      return { root: workspace, tree, autoOpen: false };
+    },
+    'library-snapshot': () => ({ projects: [], documents: [], total: 0 }),
+    'library-cancel': () => {},
     'agent-context': (input) => agent.resolveContext(input),
     'agent-hints': (input) => agent.suggestions(input),
     'agent-configuration': () => agent.configuration(),
@@ -442,7 +452,7 @@ async function run() {
       if (p !== file && p !== referenceFile) throw Error('Unexpected draft path.');
       return null;
     },
-    ...(scenario === 'table-edit' || scenario === 'agent'
+    ...(scenario === 'table-edit' || scenario === 'agent' || scenario === 'home'
       ? {
           'draft-put': (p) => {
             if (p !== file) throw Error('Unexpected draft path.');
@@ -571,7 +581,8 @@ async function run() {
         sortButton:!!document.querySelector('button[aria-label="'+(english?'Sort files':'文件排序')+'"]'),
         documentList:!!document.querySelector('.project-document-row'),
         defaultDocuments:document.querySelector('.workspace-file-view button[aria-pressed="true"]')?.textContent===(english?'Documents':'文档'),
-        ...(scenario==='formula-preview'?{formulaReady}:{})
+        ...(scenario==='formula-preview'?{formulaReady}:{}),
+        ...(scenario==='normal'?{cjkBold:[...document.querySelectorAll('.editor-host strong')].some(node=>node.textContent.includes('问题一：训练数据扩展性不足。'))}:{})
       }:scenario==='home'?{
         ...common,homePresent:visible(home),homeTopLayer:overlayTop(home),onboardingHidden:!firstRun,
         workspaceInert:document.querySelector('.workspace')?.inert===true,
@@ -603,6 +614,25 @@ async function run() {
       calls['project-overview'] &&
       calls['update-boot-ready']
     ) {
+      if (scenario === 'home') {
+        const waitFor = async (expression) => {
+          for (let i = 0; i < 100; i++) {
+            if (await window.webContents.executeJavaScript(expression)) return;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          throw Error('Finder navigation did not reach the document.');
+        };
+        window.webContents.send('open-request', { root: workspace, path: file });
+        await waitFor(
+          "!document.querySelector('.project-home') && document.querySelector('.workspace')?.inert === false",
+        );
+        window.webContents.send('command', 'library');
+        await waitFor("!!document.querySelector('.document-library')");
+        window.webContents.send('open-request', { root: workspace, path: file });
+        await waitFor(
+          "!document.querySelector('.document-library') && !document.querySelector('.project-home') && document.querySelector('.workspace')?.inert === false",
+        );
+      }
       const tableEditing =
         scenario === 'table-edit'
           ? await verifyTableEditor(window, content, () => fs.readFile(file, 'utf8'))

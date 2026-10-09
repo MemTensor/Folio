@@ -11,6 +11,17 @@ const require = createRequire(import.meta.url),
   { DingTalkClient, DingTalkError } = require('../core/dingtalk-cli.cjs'),
   { documentProjection, matchesProjection } = require('../core/dingtalk-document.cjs');
 const clone = (o) => JSON.parse(JSON.stringify(o));
+
+test('published CJK emphasis matches the document view without rewriting the source', async (t) => {
+  const { file, store } = await setup(t);
+  const source = '**问题一：训练数据扩展性不足。 **随着训练推进。\n\n中文**“重点”**接正文。';
+  await fs.writeFile(file, source);
+  const projection = await documentProjection(await store.read(file), store);
+  const serialized = JSON.stringify(projection.jsonml);
+  assert.match(serialized, /"bold":true/);
+  assert.doesNotMatch(serialized, /\*\*/);
+  assert.equal(await fs.readFile(file, 'utf8'), source);
+});
 async function setup(t) {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'folio-dingtalk-test-')),
     root = path.join(tmp, 'project'),

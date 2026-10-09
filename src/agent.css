@@ -609,11 +609,22 @@
 }
 .agent-compose-footer .agent-effort {
   flex: none;
-  max-width: 92px;
+  field-sizing: content;
+  min-width: 30px;
+  max-width: 112px;
+  height: 23px;
+  padding: 2px 3px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.agent-compose-footer .agent-effort:focus-visible {
+  outline-width: 1px;
+  outline-offset: 0;
 }
 .agent-compose-footer > span {
   margin-left: auto;
-  white-space: nowrap;
+  min-width: 0;
+  text-align: right;
   font-size: 9px;
 }
 .agent-reference-chips {

@@ -1,4 +1,6 @@
 module.exports = {
+  '默认·{level}': 'Default · {level}',
+  服务默认: 'Service default',
   '回复等待超时，指令已保留，可以重试。':
     'The response timed out. Your instruction was kept; you can retry.',
   '回复内容过长，指令已保留；可以缩小范围后重试。':

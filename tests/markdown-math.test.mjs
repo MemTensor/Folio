@@ -23,6 +23,35 @@ new Function('require', 'module', 'exports', bundled)(
   loaded.exports,
 );
 const { parser } = loaded.exports;
+
+test('CJK bold tolerates punctuation adjacency and a trailing space without changing source', () => {
+  for (const source of [
+    '**问题一：训练数据扩展性不足。 **随着训练推进。',
+    '**问题一：训练数据扩展性不足。**随着训练推进。',
+    '中文**“强调”**接正文',
+    '**中文重点 **接正文',
+    '**85% 降至 3%**，结论保持不变。',
+  ]) {
+    const tokens = parser.parse(source, {});
+    assert.equal(tokens.find((token) => token.type === 'inline').content, source);
+    assert.match(parser.render(source), /<strong>/);
+    assert.doesNotMatch(parser.render(source), /\*\*/);
+  }
+});
+
+test('CJK compatibility keeps nested formatting, code, escapes, formulas and unmatched markers', () => {
+  assert.match(parser.render('**中文 *重点*。**接正文'), /<strong>中文 <em>重点<\/em>。<\/strong>/);
+  assert.match(parser.render('`**中文。 **`'), /<code>\*\*中文。 \*\*<\/code>/);
+  assert.match(parser.render('```text\n**中文。 **\n```'), /\*\*中文。 \*\*/);
+  assert.doesNotMatch(parser.render(String.raw`\*\*中文。 \*\*`), /<strong>/);
+  assert.doesNotMatch(parser.render('**中文未结束'), /<strong>/);
+  assert.doesNotMatch(parser.render('**English ** prose'), /<strong>/);
+  assert.match(
+    parser.render('__standard bold__ and *italic*'),
+    /<strong>standard bold<\/strong> and <em>italic<\/em>/,
+  );
+  assert.match(parser.render(String.raw`$x^{**2}$`), /data-math-source="x\^\{\*\*2\}"/);
+});
 const math = (source) =>
   parser.parse(source, {}).flatMap((token) =>
     token.type === 'math_block'

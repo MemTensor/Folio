@@ -44,6 +44,21 @@ interface Props {
   disabled: boolean;
 }
 const nameOf = (path: string) => path.split('/').pop() || path;
+const effortLabel = (value: string) =>
+  t(
+    (
+      {
+        none: '不推理',
+        minimal: '极低',
+        low: '低',
+        medium: '中',
+        high: '高',
+        xhigh: '很高',
+        max: '最高',
+        ultra: '极高',
+      } as Record<string, string>
+    )[value] || value,
+  );
 const planName = (plan?: string) => {
   const known: Record<string, string> = {
     free: 'Free',
@@ -237,8 +252,9 @@ export function AgentPanel({
     connection.models[0]?.id ||
     '';
   const reconnecting = connection.phase === 'connecting';
-  const availableEfforts =
-    connection.models.find((item) => item.id === selectedModel)?.supportedEfforts || [];
+  const currentModel = connection.models.find((item) => item.id === selectedModel);
+  const availableEfforts = currentModel?.supportedEfforts || [];
+  const defaultEffort = currentModel?.effort;
   const effortKey = (connection.provider || 'chatgpt') + ':' + selectedModel;
   const selectedEffort = availableEfforts.includes(efforts[effortKey]) ? efforts[effortKey] : '';
   const established =
@@ -959,7 +975,7 @@ export function AgentPanel({
             <select
               className="agent-effort"
               aria-label={t('思考强度')}
-              title={t('思考强度')}
+              title={`${t('思考强度')} · ${selectedEffort ? effortLabel(selectedEffort) : `${t('默认强度')}：${defaultEffort ? effortLabel(defaultEffort) : t('服务默认')}`}`}
               value={selectedEffort}
               disabled={!ready || session.running}
               onChange={(event) => {
@@ -970,23 +986,14 @@ export function AgentPanel({
                 } catch {}
               }}
             >
-              <option value="">{t('默认强度')}</option>
+              <option value="">
+                {defaultEffort
+                  ? t('默认·{level}', { level: effortLabel(defaultEffort) })
+                  : t('服务默认')}
+              </option>
               {availableEfforts.map((value) => (
                 <option key={value} value={value}>
-                  {t(
-                    (
-                      {
-                        none: '不推理',
-                        minimal: '极低',
-                        low: '低',
-                        medium: '中',
-                        high: '高',
-                        xhigh: '很高',
-                        max: '最高',
-                        ultra: '极高',
-                      } as Record<string, string>
-                    )[value] || value,
-                  )}
+                  {effortLabel(value)}
                 </option>
               ))}
             </select>

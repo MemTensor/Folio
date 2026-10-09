@@ -986,9 +986,12 @@ export default function App() {
             notify(t('请先完成当前操作，再打开文档。'));
             return;
           }
+          openedFromSystem.current = true;
           await flushAll();
           const info = await bridge.acceptOpen(args.root);
           await workspace({ ...info, initial: args.path });
+          setShowHome(false);
+          setModal(null);
         }),
       ),
     ];
