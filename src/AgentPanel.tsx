@@ -518,7 +518,7 @@ export function AgentPanel({
                   disabled={busy}
                   onClick={() =>
                     void operation(async () => {
-                      await navigator.clipboard.writeText(connection.loginURL!);
+                      await bridge.copyText(connection.loginURL!);
                       setLoginCopied(true);
                     })
                   }

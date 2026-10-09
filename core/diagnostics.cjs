@@ -44,6 +44,7 @@ const OPERATIONS = new Set([
   'update-begin-install',
   'update-commit-install',
   'diagnostics-export',
+  'clipboard-write',
 ]);
 const CODES = new Set([
   'AGENT_MISSING',

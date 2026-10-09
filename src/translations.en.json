@@ -1093,5 +1093,6 @@
   "诊断信息仅含运行事件，日志最多约 1 MB；不包含正文、对话或凭据。": "Diagnostics contain runtime events only, capped at about 1 MB. Document text, conversations and credentials are excluded.",
   "找到的是桌面应用入口，请安装 Codex CLI 后重新连接。": "This entry launches a desktop app. Install Codex CLI and connect again.",
   "复制诊断信息": "Copy diagnostics",
-  "诊断信息已复制。": "Diagnostics copied."
+  "诊断信息已复制。": "Diagnostics copied.",
+  "复制内容无效或过长。": "The text to copy is invalid or too large."
 }

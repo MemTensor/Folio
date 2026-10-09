@@ -11,6 +11,7 @@ const subscribe = (name) => (callback) => {
 contextBridge.exposeInMainWorld('folio', {
   desktop: true,
   contextMenu: invoke('context-menu'),
+  copyText: invoke('clipboard-write'),
   exportDiagnostics: invoke('diagnostics-export'),
   diagnosticsSnapshot: invoke('diagnostics-snapshot'),
   agentStatus: invoke('agent-status'),

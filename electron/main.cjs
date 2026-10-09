@@ -9,6 +9,7 @@ const {
   net,
   session,
   safeStorage,
+  clipboard,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
@@ -205,7 +206,8 @@ function handle(name, fn) {
       (name.startsWith('update-') ||
         name.startsWith('agent-') ||
         name.startsWith('diagnostics-') ||
-        name === 'context-menu') &&
+        name === 'context-menu' ||
+        name === 'clipboard-write') &&
       event.senderFrame?.frameTreeNodeId !== win.webContents.mainFrame.frameTreeNodeId
     )
       throw Error(
@@ -230,6 +232,7 @@ async function init() {
     version: app.getVersion(),
   });
   diagnostics.record('app-start');
+  handle('clipboard-write', require('./clipboard.cjs').createClipboardWriter(clipboard));
   handle('diagnostics-snapshot', () => diagnostics.snapshot());
   handle('diagnostics-export', async () => {
     const snapshot = await diagnostics.snapshot();

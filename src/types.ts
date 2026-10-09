@@ -364,6 +364,7 @@ export interface Bridge {
   read(path: string): Promise<FileSnapshot>;
   exportDiagnostics(): Promise<string | null>;
   diagnosticsSnapshot(): Promise<string>;
+  copyText(text: string): Promise<void>;
   contextMenu(input: {
     kind: 'document' | 'file' | 'tab' | 'text';
     path?: string;

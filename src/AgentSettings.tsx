@@ -151,7 +151,7 @@ export function AgentSettings() {
                     disabled={busy}
                     onClick={() =>
                       void run(async () => {
-                        await navigator.clipboard.writeText(connection.loginURL!);
+                        await bridge.copyText(connection.loginURL!);
                         setMessage(t('已复制登录链接。'));
                       })
                     }
@@ -324,7 +324,7 @@ export function AgentSettings() {
             disabled={busy}
             onClick={() =>
               void run(async () => {
-                await navigator.clipboard.writeText(await bridge.diagnosticsSnapshot());
+                await bridge.copyText(await bridge.diagnosticsSnapshot());
                 setMessage(t('诊断信息已复制。'));
               })
             }

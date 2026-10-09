@@ -80,6 +80,7 @@ const demo: Bridge = {
   contextMenu: async () => null,
   exportDiagnostics: unavailable,
   diagnosticsSnapshot: unavailable,
+  copyText: (text) => navigator.clipboard.writeText(text),
   agentStatus: async () => ({ phase: 'idle', models: [] }),
   agentContext: async () => {},
   agentHints: async ({ path }) => ({ key: '', path, phase: 'unavailable', summary: '', hints: [] }),

@@ -449,6 +449,18 @@ async function verifyAgentPanel(window, original, capturePath, language) {
     ),
     en ? 'Diagnostics exported.' : '诊断信息已导出。',
   );
+  await evaluate(
+    (label) =>
+      [...document.querySelectorAll('.agent-settings button')]
+        .find((button) => button.textContent.trim() === label)
+        .click(),
+    en ? 'Copy diagnostics' : '复制诊断信息',
+  );
+  await wait(() =>
+    ['Diagnostics copied.', '诊断信息已复制。'].includes(
+      document.querySelector('.agent-settings .knowledge-message')?.textContent.trim(),
+    ),
+  );
   if (capturePath) {
     await web.executeJavaScript(
       'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',

@@ -1353,7 +1353,7 @@ export default function App() {
           : '',
       },
     );
-    await navigator.clipboard.writeText(prompt);
+    await bridge.copyText(prompt);
     notify(t('已复制文件路径与协作上下文。'));
   }
   async function fileContextMenu(p: string, kind: 'file' | 'tab' = 'file') {
@@ -1376,7 +1376,7 @@ export default function App() {
     } else if (id === 'copy-path' || id === 'copy-relative-path') {
       const value =
         id === 'copy-relative-path' && p.startsWith(folder + '/') ? p.slice(folder.length + 1) : p;
-      await navigator.clipboard.writeText(value);
+      await bridge.copyText(value);
       notify(t('已复制路径。'));
     } else if (id === 'reveal') await bridge.reveal(p);
     else if (id === 'save') await save(p);
@@ -1465,7 +1465,7 @@ export default function App() {
       if (id === 'reveal') await bridge.reveal(p);
       else {
         const folder = docsRef.current[p].root;
-        await navigator.clipboard.writeText(
+        await bridge.copyText(
           id === 'copy-relative-path' && p.startsWith(folder + '/')
             ? p.slice(folder.length + 1)
             : p,
@@ -1599,7 +1599,7 @@ export default function App() {
     else if (id.startsWith('export-')) await exportDoc(id.slice(7) as 'html' | 'pdf' | 'docx');
     else if (id === 'context') await copyContext();
     else if (id === 'copy-path') {
-      await navigator.clipboard.writeText(active);
+      await bridge.copyText(active);
       notify(t('已复制文件绝对路径。'));
     } else if (id === 'guide') {
       const guide = allFiles.find((f) => f.name === 'Markdown 语法手册.md');
@@ -2964,7 +2964,7 @@ export default function App() {
               <button
                 onClick={() =>
                   guarded(async () => {
-                    await navigator.clipboard.writeText(await bridge.diagnosticsSnapshot());
+                    await bridge.copyText(await bridge.diagnosticsSnapshot());
                     notify(t('诊断信息已复制。'));
                   })
                 }
@@ -3113,7 +3113,7 @@ export default function App() {
             <button
               onClick={() =>
                 guarded(async () => {
-                  await navigator.clipboard.writeText(modalPath);
+                  await bridge.copyText(modalPath);
                   setModal(null);
                   notify(t('已复制路径。'));
                 })

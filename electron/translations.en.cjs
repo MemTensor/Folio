@@ -1,4 +1,5 @@
 module.exports = {
+  '复制内容无效或过长。': 'The text to copy is invalid or too large.',
   复制诊断信息: 'Copy diagnostics',
   '诊断信息已复制。': 'Diagnostics copied.',
   '找到的是桌面应用入口，请安装 Codex CLI 后重新连接。':

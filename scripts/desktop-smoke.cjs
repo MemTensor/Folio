@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, protocol, session, Menu } = require('electr
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { AgentService } = require('../core/agent-service.cjs');
 const { Diagnostics } = require('../core/diagnostics.cjs');
@@ -326,6 +327,13 @@ async function run() {
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
   const handlers = {
+    'clipboard-write': require('../electron/clipboard.cjs').createClipboardWriter({
+      writeText(text) {
+        const report = JSON.parse(text);
+        assert(report.entries.length > 0);
+        assert(!text.includes(marker) && !text.includes('generated-api-key'));
+      },
+    }),
     'diagnostics-snapshot': () => diagnostics.snapshot(),
     'diagnostics-export': async () => {
       const snapshot = await diagnostics.snapshot();

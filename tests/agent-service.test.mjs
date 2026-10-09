@@ -61,7 +61,7 @@ async function fixture(t, options = {}) {
     client,
     onEvent: (event) => events.push(event),
     openExternal: async (url) => urls.push(url),
-    idleDelay: 8,
+    idleDelay: null,
     recoveryDelay: 5,
     ...options,
   });
@@ -256,7 +256,7 @@ test('partial acceptance is durable, reversible and cannot be applied twice', as
 });
 
 test('concurrent sends are serialized and a hidden panel releases its runtime after the response', async (t) => {
-  const { service, client, input } = await fixture(t);
+  const { service, client, input } = await fixture(t, { idleDelay: 8 });
   await service.acquire('panel');
   await service.connect();
   const first = service.send(input);
@@ -272,7 +272,7 @@ test('concurrent sends are serialized and a hidden panel releases its runtime af
 });
 
 test('closing and reopening restores sign-in while an old panel cannot close the new connection', async (t) => {
-  const { service, client } = await fixture(t);
+  const { service, client } = await fixture(t, { idleDelay: 8 });
   await service.acquire('first-panel');
   await service.connect();
   service.release('first-panel');
@@ -290,7 +290,7 @@ test('closing and reopening restores sign-in while an old panel cannot close the
 });
 
 test('a reopen during process shutdown waits for exit and preserves monotonic connection snapshots', async (t) => {
-  const { service, client, events } = await fixture(t);
+  const { service, client, events } = await fixture(t, { idleDelay: 8 });
   await service.acquire('old-panel');
   await service.connect();
   let finishClose;
@@ -336,7 +336,7 @@ test('unexpected process loss reconnects once without replaying the document req
 });
 
 test('saved opt-in survives restart, explicit disconnect stays off, and beta.8 sign-in migrates by file metadata', async (t) => {
-  const { service, client } = await fixture(t);
+  const { service, client } = await fixture(t, { idleDelay: 8 });
   client.home = service.dataDir + '/codex-home';
   await mkdir(client.home);
   await writeFile(client.home + '/auth.json', 'not parsed by Folio');
