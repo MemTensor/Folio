@@ -36,3 +36,11 @@ test('repository identity rejects arbitrary endpoints and malformed paths', () =
     assert.throws(() => identity(url), /Invalid GitHub repository/);
   assert.equal(identity('https://github.com/MemTensor/Folio.git').REPOSITORY, 'MemTensor/Folio');
 });
+
+test('installation and update documentation points to the canonical release repository', async () => {
+  for (const file of ['README.md', 'README.en.md', 'docs/更新说明.md', 'docs/开源与分发说明.md']) {
+    const content = await fs.readFile(new URL('../' + file, import.meta.url), 'utf8');
+    assert.match(content, /https:\/\/github\.com\/MemTensor\/Folio\/releases/);
+    assert.doesNotMatch(content, /https:\/\/github\.com\/glin93\/folio\/releases/);
+  }
+});

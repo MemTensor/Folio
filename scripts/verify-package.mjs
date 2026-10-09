@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import repository from '../core/repository.cjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const { version } = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
@@ -34,6 +35,13 @@ if (workspace.code !== 0 || !workspace.out.includes('"ok":true'))
 const agent = await run([path.join(root, 'scripts/verify-agent-package.cjs'), bundle]);
 if (agent.code !== 0 || !agent.out.includes('"ok":true'))
   throw Error('Packaged agent check failed: ' + (agent.err || agent.out));
+const update = await run([
+  path.join(root, 'scripts/verify-update-package.cjs'),
+  bundle,
+  repository.REPOSITORY,
+]);
+if (update.code !== 0 || !update.out.includes('"ok":true'))
+  throw Error('Packaged update source check failed: ' + (update.err || update.out));
 
 // The bundled CLI runs through ELECTRON_RUN_AS_NODE, so this also confirms the
 // runAsNode fuse is still on after the fuse flip.
@@ -42,5 +50,5 @@ if (cli.code !== 0 || !cli.out.includes(version))
   throw Error('Bundled CLI failed inside the package: ' + (cli.err || cli.out));
 
 console.log(
-  'Packaged bundle verified: asar workers, document catalog, Agent proposals and the bundled CLI.',
+  'Packaged bundle verified: asar workers, document catalog, Agent proposals, update source and the bundled CLI.',
 );

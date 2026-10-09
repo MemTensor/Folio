@@ -25,9 +25,9 @@ Plans, technical proposals, experiment records and project notes accumulate acro
 
 ### Desktop app
 
-[Download v0.5.0-beta.13 for macOS Apple Silicon](https://github.com/glin93/folio/releases/download/v0.5.0-beta.13/Folio-0.5.0-beta.13-arm64-mac.zip). Unzip and move `Folio.app` to Applications.
+[Download v0.5.0-beta.14 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.14/Folio-0.5.0-beta.14-arm64-mac.zip). Unzip and move `Folio.app` to Applications.
 
-This private test build remains in the original distribution repository and requires access to it. Packages do not yet have Developer ID signing or Apple notarization. The current source repository is **MemTensor/Folio**, is private, and has no open-source license grant.
+Source and installation packages are hosted in MemTensor/Folio and require repository access. Packages do not yet have Developer ID signing or Apple notarization. The current source repository is **MemTensor/Folio**, is private, and has no open-source license grant.
 
 ### Run from source
 

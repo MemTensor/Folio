@@ -43,11 +43,11 @@ Claude Code 或 Codex 修改文件后，Folio 会显示变化。如果你也在�
 
 ### 下载桌面应用
 
-[下载 Folio v0.5.0-beta.13 · macOS Apple Silicon](https://github.com/glin93/folio/releases/download/v0.5.0-beta.13/Folio-0.5.0-beta.13-arm64-mac.zip)
+[下载 Folio v0.5.0-beta.14 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.14/Folio-0.5.0-beta.14-arm64-mac.zip)
 
-解压后将 `Folio.app` 放入应用程序文件夹。当前版本为 **v0.5.0-beta.13**，也可按下方步骤本地构建。各版本的功能与限制见 [更新记录](CHANGELOG.md)。
+解压后将 `Folio.app` 放入应用程序文件夹。当前版本为 **v0.5.0-beta.14**，也可按下方步骤本地构建。各版本的功能与限制见 [更新记录](CHANGELOG.md)。
 
-安装包尚未签名和公证。源码仓库为 [MemTensor/Folio](https://github.com/MemTensor/Folio)，当前为私有且未授予开源许可。已发布的 beta.13 安装包保留在原测试版分发仓库，下载需要相应访问权限。
+安装包尚未签名和公证。源码仓库为 [MemTensor/Folio](https://github.com/MemTensor/Folio)，当前为私有且未授予开源许可。安装包与源码均从该仓库获取，下载需要相应访问权限。
 
 ### 应用内更新
 
