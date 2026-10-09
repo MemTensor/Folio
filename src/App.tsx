@@ -1356,6 +1356,124 @@ export default function App() {
     await navigator.clipboard.writeText(prompt);
     notify(t('已复制文件路径与协作上下文。'));
   }
+  async function fileContextMenu(p: string, kind: 'file' | 'tab' = 'file') {
+    if (richEditing.current || updatePreparation.current || projectRemoving.current) return;
+    if (!bridge.desktop) {
+      setModalPath(p);
+      setModal('file-menu');
+      return;
+    }
+    const folder = docsRef.current[p]?.root || rootRef.current;
+    const tabs = Object.keys(docsRef.current);
+    const id = await bridge.contextMenu({ kind, path: p, editable: false, selection: false });
+    if (!id) return;
+    if (kind === 'tab' && !docsRef.current[p]) return;
+    if (id === 'open') await openFile(p);
+    else if (id === 'rename') {
+      setModalPath(p);
+      setInput(nameOf(p));
+      setModal('rename');
+    } else if (id === 'copy-path' || id === 'copy-relative-path') {
+      const value =
+        id === 'copy-relative-path' && p.startsWith(folder + '/') ? p.slice(folder.length + 1) : p;
+      await navigator.clipboard.writeText(value);
+      notify(t('已复制路径。'));
+    } else if (id === 'reveal') await bridge.reveal(p);
+    else if (id === 'save') await save(p);
+    else if (id === 'trash') {
+      await flushDraft(p);
+      const current = docsRef.current[p];
+      if (current && (changed(current) || current.pending !== undefined || current.restorePending))
+        throw Error(t('请先保存并处理当前文档的待审阅修改。'));
+      await bridge.trash(p);
+      if (current) await closeTab(p);
+      await refreshTree();
+      notify(t('文件已移入回收站。'));
+    } else if (id.startsWith('close-')) {
+      const index = tabs.indexOf(p);
+      const targets =
+        id === 'close-tab'
+          ? [p]
+          : id === 'close-right'
+            ? tabs.slice(index + 1)
+            : id === 'close-others'
+              ? tabs.filter((file) => file !== p)
+              : id === 'close-all'
+                ? tabs
+                : [];
+      for (const path of targets) if (docsRef.current[path]) await closeTab(path);
+    }
+  }
+  async function documentContextMenu(target: HTMLElement, surface: HTMLDivElement) {
+    if (
+      !bridge.desktop ||
+      !doc ||
+      richEditing.current ||
+      updatePreparation.current ||
+      projectRemoving.current
+    )
+      return;
+    const p = activeRef.current,
+      revision = doc.revision;
+    const view = editor.current?.view;
+    const editable =
+      effectiveMode !== 'read' &&
+      !!view &&
+      !view.state.readOnly &&
+      view.state.doc.toString() === doc.content &&
+      !target.closest('.md-block') &&
+      selectedWidgetText(view) === null;
+    const native = window.getSelection();
+    const block = target.closest('.md-block');
+    const blockKind = block?.querySelector('.table-edit-button')
+      ? block.classList.contains('block-table_open')
+        ? 'table'
+        : block.classList.contains('block-math_block')
+          ? 'math'
+          : 'diagram'
+      : undefined;
+    const selection = editable
+      ? !view!.state.selection.main.empty
+      : !!(native?.toString() && native.anchorNode && surface.contains(native.anchorNode));
+    const id = await bridge.contextMenu({
+      kind: 'document',
+      path: p,
+      editable,
+      selection,
+      blockKind,
+    });
+    if (!id) return;
+    if (activeRef.current !== p || docsRef.current[p]?.revision !== revision) {
+      notify(t('文档已变化，请重新打开右键菜单。'));
+      return;
+    }
+    if (id === 'edit-block' && block?.isConnected)
+      (block.querySelector('.table-edit-button') as HTMLButtonElement | null)?.click();
+    else if (id === 'document-agent') setPanel('agent');
+    else if (id === 'edit-source') setMode('source');
+    else if (id === 'select-document') {
+      if (effectiveMode === 'read' && reader.current) {
+        const range = window.document.createRange();
+        range.selectNodeContents(reader.current);
+        native?.removeAllRanges();
+        native?.addRange(range);
+      } else if (view) {
+        view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+        view.focus();
+      }
+    } else if (['copy-path', 'copy-relative-path', 'reveal'].includes(id)) {
+      if (id === 'reveal') await bridge.reveal(p);
+      else {
+        const folder = docsRef.current[p].root;
+        await navigator.clipboard.writeText(
+          id === 'copy-relative-path' && p.startsWith(folder + '/')
+            ? p.slice(folder.length + 1)
+            : p,
+        );
+        notify(t('已复制路径。'));
+      }
+    } else await actionRef.current(id);
+  }
   async function action(id: string) {
     if (firstRun && !['settings', 'updates', 'close-request'].includes(id)) return;
     if (
@@ -1696,7 +1814,32 @@ export default function App() {
   } as CSSProperties;
 
   return (
-    <div className={'app ' + (zen ? 'zen ' : '') + (prefs.focus ? 'focus-on' : '')} style={css}>
+    <div
+      className={'app ' + (zen ? 'zen ' : '') + (prefs.focus ? 'focus-on' : '')}
+      style={css}
+      onContextMenu={(event) => {
+        if (!bridge.desktop) return;
+        const field = (event.target as HTMLElement).closest('input,textarea') as
+          HTMLInputElement | HTMLTextAreaElement | null;
+        if (!field) return;
+        if (
+          field instanceof HTMLInputElement &&
+          ['checkbox', 'radio', 'range', 'file', 'color', 'button', 'submit', 'reset'].includes(
+            field.type,
+          )
+        )
+          return;
+        event.preventDefault();
+        field.focus({ preventScroll: true });
+        guarded(() =>
+          bridge.contextMenu({
+            kind: 'text',
+            editable: !field.disabled && !field.readOnly,
+            selection: field.selectionStart !== field.selectionEnd,
+          }),
+        );
+      }}
+    >
       <header className="titlebar">
         <div className="titlebar-left">
           <div className="traffic-space" />
@@ -1810,10 +1953,7 @@ export default function App() {
                       refresh={treeRefresh}
                       enabled={!loading && !showHome && !firstRun}
                       onOpen={(p) => guarded(() => openFile(p))}
-                      onMenu={(p) => {
-                        setModalPath(p);
-                        setModal('file-menu');
-                      }}
+                      onMenu={(p) => guarded(() => fileContextMenu(p))}
                     />
                   ) : (
                     <>
@@ -1829,10 +1969,7 @@ export default function App() {
                         refresh={treeRefresh}
                         active={active}
                         onOpen={(p) => guarded(() => openFile(p))}
-                        onMenu={(p) => {
-                          setModalPath(p);
-                          setModal('file-menu');
-                        }}
+                        onMenu={(p) => guarded(() => fileContextMenu(p))}
                       />
                       {treeLimited && (
                         <div className="sidebar-empty">
@@ -1933,6 +2070,10 @@ export default function App() {
                     className={'doc-tab ' + (p === active ? 'active' : '')}
                     title={p}
                     onClick={() => select(p)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      guarded(() => fileContextMenu(p, 'tab'));
+                    }}
                   >
                     <FileText size={14} />
                     <span className="tab-label">
@@ -2118,6 +2259,15 @@ export default function App() {
                   data-document-path={active}
                   data-document-revision={doc.revision}
                   data-document-mode={effectiveMode}
+                  onContextMenu={(event) => {
+                    if (!bridge.desktop || (event.target as HTMLElement).closest('input,textarea'))
+                      return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const target = event.target as HTMLElement,
+                      surface = event.currentTarget;
+                    guarded(() => documentContextMenu(target, surface));
+                  }}
                 >
                   <PreviewBoundary
                     resetKey={active + ':' + effectiveMode}

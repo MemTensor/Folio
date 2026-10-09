@@ -201,11 +201,11 @@ function handle(name, fn) {
     )
       throw Error('无效的请求来源。');
     if (
-      (name.startsWith('update-') || name.startsWith('agent-')) &&
+      (name.startsWith('update-') || name.startsWith('agent-') || name === 'context-menu') &&
       event.senderFrame?.frameTreeNodeId !== win.webContents.mainFrame.frameTreeNodeId
     )
       throw Error(
-        name.startsWith('agent-') ? '无效的请求来源。' : '更新请求必须来自当前应用窗口。',
+        name.startsWith('update-') ? '更新请求必须来自当前应用窗口。' : '无效的请求来源。',
       );
     const finish = updateGate.enter(name);
     try {
@@ -397,6 +397,16 @@ async function init() {
     if (root !== requestedRoot) throw Error('请使用文件选择窗口打开项目。');
     requestedRoot = null;
     return watchRoot(root);
+  });
+  handle('context-menu', async (input) => {
+    const { contextItems, popupContext } = require('./context-menu.cjs');
+    contextItems(input, translateUI, () => {});
+    if (input?.kind !== 'text') {
+      if (typeof input?.path !== 'string' || input.path.length > 8192)
+        throw Error('右键菜单请求无效。');
+      await workspaces.forPath(input.path);
+    }
+    return popupContext(Menu, win, input, translateUI);
   });
   const oldOpenPath = openPath;
   openPath = async (file) => {

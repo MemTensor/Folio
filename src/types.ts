@@ -361,6 +361,13 @@ export interface Bridge {
   watchDocuments(paths: string[]): Promise<void>;
   quickOpen(root: string, query: string): Promise<Array<{ path: string; name: string }>>;
   read(path: string): Promise<FileSnapshot>;
+  contextMenu(input: {
+    kind: 'document' | 'file' | 'tab' | 'text';
+    path?: string;
+    editable: boolean;
+    selection: boolean;
+    blockKind?: 'table' | 'math' | 'diagram';
+  }): Promise<string | null>;
   save(args: FileSnapshot & { expectedHash: string | null }): Promise<SaveResult>;
   search(query: string, root?: string): Promise<SearchResult[]>;
   history(path: string): Promise<HistoryMetadata[]>;

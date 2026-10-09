@@ -1,4 +1,18 @@
 module.exports = {
+  复制相对路径: 'Copy relative path',
+  关闭标签: 'Close tab',
+  关闭其他标签: 'Close other tabs',
+  关闭右侧标签: 'Close tabs to the right',
+  关闭所有标签: 'Close all tabs',
+  撤销: 'Undo',
+  重做: 'Redo',
+  剪切: 'Cut',
+  复制: 'Copy',
+  粘贴: 'Paste',
+  粘贴为纯文本: 'Paste as plain text',
+  全选: 'Select all',
+  '右键菜单请求无效。': 'Invalid context menu request.',
+  '文档已变化，请重新打开右键菜单。': 'The document changed. Open the context menu again.',
   '默认·{level}': 'Default · {level}',
   服务默认: 'Service default',
   '回复等待超时，指令已保留，可以重试。':

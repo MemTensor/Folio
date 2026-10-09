@@ -24,6 +24,15 @@ const path = require('node:path');
     `https://api.github.com/repos/${expected}/releases?per_page=100&page=1`,
   ]);
   await assert.rejects(source.request('repos/glin93/folio/releases'), { code: 'BAD_SOURCE' });
+  const { contextItems, popupContext } = require(path.join(resource, 'electron/context-menu.cjs'));
+  assert.equal(typeof popupContext, 'function');
+  const context = contextItems(
+    { kind: 'document', editable: false, selection: true },
+    (value) => value,
+    () => {},
+  );
+  assert.equal(context.find((item) => item.role === 'copy').enabled, true);
+  assert.equal(context.find((item) => item.role === 'paste').enabled, false);
   console.log(JSON.stringify({ ok: true, repository: REPOSITORY, page: RELEASE_PAGE }));
 })().catch((error) => {
   console.error(error.message);

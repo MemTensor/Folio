@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, protocol, session } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, session, Menu } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -12,6 +12,8 @@ const { captureDocumentPreview } = require('../electron/agent-preview.cjs');
 const { verifyTableEditor } = require('./desktop-table-check.cjs');
 const { verifyBlockSelection } = require('./desktop-block-check.cjs');
 const { verifyAgentPanel } = require('./desktop-agent-check.cjs');
+const { verifyContextMenu } = require('./desktop-context-check.cjs');
+const { contextItems } = require('../electron/context-menu.cjs');
 
 const temporary = path.resolve(process.argv[2]),
   dist = path.resolve(process.argv[3]);
@@ -74,6 +76,7 @@ const content =
 const errors = [],
   unexpectedIPC = [],
   calls = {};
+let contextAction = null;
 let window,
   finished = false;
 app.setPath('userData', path.join(temporary, 'user-data'));
@@ -317,6 +320,30 @@ async function run() {
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
   const handlers = {
+    'context-menu': (input) => {
+      if (input.kind !== 'text' && input.path !== file) throw Error('Unexpected context file.');
+      let result = null;
+      const menu = Menu.buildFromTemplate(
+        contextItems(
+          input,
+          (value) => value,
+          (id) => (result = id),
+        ),
+      );
+      const find = (items) =>
+        items
+          .flatMap((item) => (item.submenu ? find(item.submenu.items) : [item]))
+          .find((item) => item.id === contextAction);
+      const item = find(menu.items);
+      if (!item || !item.enabled)
+        throw Error('Requested context action is absent or disabled: ' + contextAction);
+      item.click(item, window, {});
+      contextAction = null;
+      return result;
+    },
+    reveal: (p) => {
+      if (p !== file) throw Error('Wrong file targeted by the context menu.');
+    },
     'accept-open': (p) => {
       if (p !== workspace) throw Error('Unexpected Finder project.');
       return { root: workspace, tree, autoOpen: false };
@@ -452,7 +479,10 @@ async function run() {
       if (p !== file && p !== referenceFile) throw Error('Unexpected draft path.');
       return null;
     },
-    ...(scenario === 'table-edit' || scenario === 'agent' || scenario === 'home'
+    ...(scenario === 'table-edit' ||
+    scenario === 'agent' ||
+    scenario === 'home' ||
+    scenario === 'normal'
       ? {
           'draft-put': (p) => {
             if (p !== file) throw Error('Unexpected draft path.');
@@ -635,7 +665,17 @@ async function run() {
       }
       const tableEditing =
         scenario === 'table-edit'
-          ? await verifyTableEditor(window, content, () => fs.readFile(file, 'utf8'))
+          ? await verifyTableEditor(
+              window,
+              content,
+              () => fs.readFile(file, 'utf8'),
+              async () => {
+                contextAction = 'edit-block';
+                await window.webContents.executeJavaScript(
+                  "document.querySelector('.block-table_open').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true,cancelable:true,button:2}))",
+                );
+              },
+            )
           : null;
       const blockSelection =
         scenario === 'block-select'
@@ -644,6 +684,10 @@ async function run() {
       const agentPanel =
         scenario === 'agent'
           ? await verifyAgentPanel(window, content, capturePath, language)
+          : null;
+      const contextMenu =
+        scenario === 'normal'
+          ? await verifyContextMenu(window, (id) => (contextAction = id), marker)
           : null;
       if (errors.length || unexpectedIPC.length)
         return finish(false, { observed, tableEditing, blockSelection });
@@ -661,6 +705,7 @@ async function run() {
         ...(tableEditing ? { tableEditing } : { fixtureUnchanged: true }),
         ...(blockSelection ? { blockSelection } : {}),
         ...(agentPanel ? { agentPanel } : {}),
+        ...(contextMenu ? { contextMenu } : {}),
         ...(capturePath ? { capturePath } : {}),
       });
     }

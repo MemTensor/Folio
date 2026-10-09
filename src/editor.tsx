@@ -674,8 +674,16 @@ export function runCommand(view: EditorView, id: string) {
   const range = view.state.selection.main,
     selected = view.state.sliceDoc(range.from, range.to),
     line = view.state.doc.lineAt(range.from);
-  const wrap = (mark: string, fallback = documentText('文字', 'text'), end = mark) =>
-    insertText(view, mark + (selected || fallback) + end, selected || fallback);
+  const wrap = (mark: string, fallback = documentText('文字', 'text'), end = mark) => {
+    const value = selected || fallback;
+    const core = value.trim();
+    if (!core) return;
+    // Inline delimiters must hug the text. Keep selected indentation and line
+    // breaks outside them so formatting a whole line still renders correctly.
+    const leading = value.slice(0, value.indexOf(core));
+    const trailing = value.slice(value.indexOf(core) + core.length);
+    insertText(view, leading + mark + core + end + trailing, core);
+  };
   if (id === 'bold') wrap('**');
   else if (id === 'italic') wrap('*');
   else if (id === 'strike') wrap('~~');

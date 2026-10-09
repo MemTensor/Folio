@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 
 // Exercise the built application through its real DOM and preload bridge. The
 // caller supplies only a generated document and a generated-file save backend.
-async function verifyTableEditor(window, initialContent, readSavedContent) {
+async function verifyTableEditor(window, initialContent, readSavedContent, contextOpen = null) {
   const web = window.webContents;
   const cells = '.table-editor tbody tr:nth-child(2)';
   const firstCell = `${cells} td:nth-child(1) textarea`;
@@ -55,7 +55,8 @@ async function verifyTableEditor(window, initialContent, readSavedContent) {
     await waitFor('table reopened', async () => (await value(multilineCell)) !== undefined);
   }
 
-  await evaluate(() => document.querySelector('.block-table_open .table-edit-button').click());
+  if (contextOpen) await contextOpen();
+  else await evaluate(() => document.querySelector('.block-table_open .table-edit-button').click());
   await waitFor('multiline text area', async () => (await value(multilineCell)) !== undefined);
   assert.equal(await value(multilineCell), 'one\ntwo');
   await focusEnd(multilineCell);
