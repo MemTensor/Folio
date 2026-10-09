@@ -363,6 +363,7 @@ export interface Bridge {
   quickOpen(root: string, query: string): Promise<Array<{ path: string; name: string }>>;
   read(path: string): Promise<FileSnapshot>;
   exportDiagnostics(): Promise<string | null>;
+  diagnosticsSnapshot(): Promise<string>;
   contextMenu(input: {
     kind: 'document' | 'file' | 'tab' | 'text';
     path?: string;

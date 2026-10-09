@@ -326,6 +326,7 @@ async function run() {
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
   const handlers = {
+    'diagnostics-snapshot': () => diagnostics.snapshot(),
     'diagnostics-export': async () => {
       const snapshot = await diagnostics.snapshot();
       if (snapshot.includes(marker) || snapshot.includes('generated-api-key'))

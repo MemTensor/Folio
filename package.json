@@ -1,7 +1,7 @@
 {
   "name": "folio-markdown",
   "productName": "Folio",
-  "version": "0.5.0-beta.16",
+  "version": "0.5.0-beta.17",
   "private": true,
   "license": "UNLICENSED",
   "repository": {
@@ -85,7 +85,7 @@
     "appId": "io.folio.markdown",
     "productName": "Folio",
     "directories": {
-      "output": "release/v0.5.0-beta.16"
+      "output": "release/v0.5.0-beta.17"
     },
     "files": [
       "dist/**/*",

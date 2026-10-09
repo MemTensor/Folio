@@ -202,7 +202,10 @@ function handle(name, fn) {
     )
       throw Error('无效的请求来源。');
     if (
-      (name.startsWith('update-') || name.startsWith('agent-') || name === 'context-menu') &&
+      (name.startsWith('update-') ||
+        name.startsWith('agent-') ||
+        name.startsWith('diagnostics-') ||
+        name === 'context-menu') &&
       event.senderFrame?.frameTreeNodeId !== win.webContents.mainFrame.frameTreeNodeId
     )
       throw Error(
@@ -227,11 +230,15 @@ async function init() {
     version: app.getVersion(),
   });
   diagnostics.record('app-start');
+  handle('diagnostics-snapshot', () => diagnostics.snapshot());
   handle('diagnostics-export', async () => {
     const snapshot = await diagnostics.snapshot();
     const result = await dialog.showSaveDialog(win, {
       title: translateUI('导出诊断信息'),
-      defaultPath: 'Folio-diagnostics-' + new Date().toISOString().slice(0, 10) + '.json',
+      defaultPath: path.join(
+        app.getPath('downloads'),
+        'Folio-diagnostics-' + new Date().toISOString().slice(0, 10) + '.json',
+      ),
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (result.canceled || !result.filePath) return null;

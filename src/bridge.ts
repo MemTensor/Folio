@@ -79,6 +79,7 @@ const demo: Bridge = {
   desktop: false,
   contextMenu: async () => null,
   exportDiagnostics: unavailable,
+  diagnosticsSnapshot: unavailable,
   agentStatus: async () => ({ phase: 'idle', models: [] }),
   agentContext: async () => {},
   agentHints: async ({ path }) => ({ key: '', path, phase: 'unavailable', summary: '', hints: [] }),

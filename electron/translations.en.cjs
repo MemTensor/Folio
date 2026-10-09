@@ -1,4 +1,6 @@
 module.exports = {
+  复制诊断信息: 'Copy diagnostics',
+  '诊断信息已复制。': 'Diagnostics copied.',
   '找到的是桌面应用入口，请安装 Codex CLI 后重新连接。':
     'This entry launches a desktop app. Install Codex CLI and connect again.',
   'Codex 安装缺少当前 Mac 的原生程序，请重新安装 Codex CLI 后连接。':

@@ -31,7 +31,7 @@ Optional project discovery reads local Codex / Claude Code project records. File
 
 ## Get started
 
-**[Download v0.5.0-beta.16 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.16/Folio-0.5.0-beta.16-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
+**[Download v0.5.0-beta.17 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.17/Folio-0.5.0-beta.17-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
 
 Unzip and move `Folio.app` to Applications, then open a Markdown file or project folder.
 
@@ -118,7 +118,7 @@ npm run desktop
 
 Use `npm run check`, `npm run pack` and `npm run dist` to validate and build. Read [contributing](CONTRIBUTING.md) and [security](SECURITY.md) before submitting changes.
 
-For connection or operation problems, **export diagnostics** from writing settings or Agent settings. Local logs are capped at about 1 MB and contain runtime events and error categories, excluding document text, conversations, credentials and sign-in links.
+For connection or operation problems, **copy or export diagnostics** from writing settings or Agent settings. Local logs are capped at about 1 MB and contain runtime events and error categories, excluding document text, conversations, credentials and sign-in links.
 
 ## Roadmap
 

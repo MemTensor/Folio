@@ -320,6 +320,17 @@ export function AgentSettings() {
           >
             {t('导出诊断信息')}
           </button>
+          <button
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await navigator.clipboard.writeText(await bridge.diagnosticsSnapshot());
+                setMessage(t('诊断信息已复制。'));
+              })
+            }
+          >
+            {t('复制诊断信息')}
+          </button>
         </div>
       )}
     </div>

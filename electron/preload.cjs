@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('folio', {
   desktop: true,
   contextMenu: invoke('context-menu'),
   exportDiagnostics: invoke('diagnostics-export'),
+  diagnosticsSnapshot: invoke('diagnostics-snapshot'),
   agentStatus: invoke('agent-status'),
   agentContext: invoke('agent-context'),
   agentHints: invoke('agent-hints'),

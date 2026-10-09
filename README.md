@@ -40,7 +40,7 @@
 
 ### 安装桌面应用
 
-**[下载 Folio v0.5.0-beta.16 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.16/Folio-0.5.0-beta.16-arm64-mac.zip)** · [版本说明](CHANGELOG.md)
+**[下载 Folio v0.5.0-beta.17 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.17/Folio-0.5.0-beta.17-arm64-mac.zip)** · [版本说明](CHANGELOG.md)
 
 解压，将 `Folio.app` 放入应用程序文件夹，然后打开 Markdown 文件或项目目录。
 
@@ -127,7 +127,7 @@ npm run desktop
 
 验证与构建使用 `npm run check`、`npm run pack` 和 `npm run dist`。提交规范见 [参与开发](CONTRIBUTING.md)，安全问题见 [安全说明](SECURITY.md)。
 
-反馈连接或操作问题时，可在写作设置或 Agent 设置中**导出诊断信息**。本地日志最多约 1 MB，仅保留运行事件与错误类别，不记录正文、对话、凭据或登录链接。
+反馈连接或操作问题时，可在写作设置或 Agent 设置中**复制或导出诊断信息**。本地日志最多约 1 MB，仅保留运行事件与错误类别，不记录正文、对话、凭据或登录链接。
 
 ## 路线图
 

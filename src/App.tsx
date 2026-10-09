@@ -2960,6 +2960,17 @@ export default function App() {
               >
                 {t('导出诊断信息')}
               </button>
+              <span> · </span>
+              <button
+                onClick={() =>
+                  guarded(async () => {
+                    await navigator.clipboard.writeText(await bridge.diagnosticsSnapshot());
+                    notify(t('诊断信息已复制。'));
+                  })
+                }
+              >
+                {t('复制诊断信息')}
+              </button>
             </div>
           </div>
         </Modal>
