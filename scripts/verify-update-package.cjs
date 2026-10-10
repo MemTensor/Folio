@@ -31,7 +31,7 @@ const path = require('node:path');
     (value) => value,
     () => {},
   );
-  assert.equal(context.find((item) => item.role === 'copy').enabled, true);
+  assert.equal(context.find((item) => item.id === 'copy-preview').enabled, true);
   assert.equal(context.find((item) => item.role === 'paste').enabled, false);
   console.log(JSON.stringify({ ok: true, repository: REPOSITORY, page: RELEASE_PAGE }));
 })().catch((error) => {
