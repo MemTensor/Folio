@@ -1671,6 +1671,95 @@ kbd {
 .settings-body {
   padding: 22px 25px;
 }
+.settings-columns {
+  width: 800px;
+  height: 600px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.settings-columns .modal-heading {
+  flex: 0 0 58px;
+}
+.settings-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.settings-sidebar {
+  width: 174px;
+  flex: 0 0 174px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  overflow: auto;
+}
+.settings-sidebar button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 10px 11px;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+}
+.settings-sidebar button > svg {
+  flex-shrink: 0;
+}
+.settings-sidebar button.selected {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.settings-section-title {
+  margin: 0;
+  padding: 24px 25px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.settings-description {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 8px 0 18px;
+}
+.settings-diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.settings-content .agent-settings,
+.settings-content .memory-settings {
+  padding-top: 14px;
+}
+@media (max-width: 640px) {
+  .settings-sidebar {
+    width: 132px;
+    flex-basis: 132px;
+    padding: 12px 6px;
+  }
+  .settings-sidebar button {
+    gap: 6px;
+    padding: 9px 7px;
+    font-size: 11px;
+  }
+  .settings-content .settings-body {
+    padding: 18px;
+  }
+  .settings-section-title {
+    padding: 20px 18px 0;
+  }
+}
 .settings-label {
   font-size: 10px;
   color: var(--muted);

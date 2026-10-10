@@ -1,4 +1,6 @@
 module.exports = {
+  复制带格式文本: 'Copy rich text',
+  '复制 Markdown 源码': 'Copy Markdown source',
   返回设置: 'Back to settings',
   关闭并返回设置: 'Close and return to settings',
   启用网络图片: 'Enable remote images',
@@ -286,7 +288,6 @@ module.exports = {
   '衬线 / 宋体': 'Serif',
   文字大小: 'Text size',
   正文宽度: 'Text width',
-  写作与协作: 'Writing and collaboration',
   自动保存: 'Autosave',
   '停止输入 1.5 秒后保存；冲突时暂停。':
     'Save after 1.5 seconds of inactivity. Pause when there is a conflict.',
@@ -301,7 +302,6 @@ module.exports = {
   加载网络图片: 'Load remote images',
   '开启后，图片来源网站会收到加载请求。':
     'When enabled, image hosts receive requests to load images.',
-  '· 本地 Markdown 编辑器': '· Local Markdown editor',
   '文档以纯文本保存，历史与恢复草稿保存在应用数据目录。':
     'Documents are plain text. History and recovery drafts are stored in the app data folder.',
   '检查更新…': 'Check for updates…',

@@ -17,6 +17,7 @@ export interface RenderEnv {
   path?: string;
   remoteImages?: boolean;
   imageControls?: boolean;
+  copySource?: string;
   headings?: Heading[];
   lineOffset?: number;
 }
@@ -31,6 +32,8 @@ export const escapeHTML = (s: string) =>
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
+const copyMarker = (token: any) =>
+  token.meta?.folioCopyId ? ` data-folio-copy-id="${token.meta.folioCopyId}"` : '';
 export const parser = new MarkdownIt({
   html: true,
   linkify: true,
@@ -169,7 +172,7 @@ parser.block.ruler.before(
   { alt: ['paragraph', 'reference', 'blockquote', 'list'] },
 );
 parser.renderer.rules.math_block = (tokens, i) =>
-  `<div class="math-preview" data-math-source="${escapeHTML(tokens[i].content)}" data-math-display="true">${escapeHTML(tokens[i].content)}</div>`;
+  `<div${copyMarker(tokens[i])} class="math-preview" data-math-source="${escapeHTML(tokens[i].content)}" data-math-display="true">${escapeHTML(tokens[i].content)}</div>`;
 parser.block.ruler.before('hr', 'frontmatter', (state, start, end, silent) => {
   if (start !== 0 || state.src.slice(state.bMarks[0], state.eMarks[0]).trim() !== '---')
     return false;
@@ -189,7 +192,7 @@ parser.block.ruler.before('hr', 'frontmatter', (state, start, end, silent) => {
   return true;
 });
 parser.renderer.rules.frontmatter = (tokens, i) =>
-  `<pre class="frontmatter"><span>${escapeHTML(t('文档属性'))}</span><code>${escapeHTML(tokens[i].content)}</code></pre>`;
+  `<pre${copyMarker(tokens[i])} class="frontmatter"><span>${escapeHTML(t('文档属性'))}</span><code>${escapeHTML(tokens[i].content)}</code></pre>`;
 parser.block.ruler.before('paragraph', 'toc', (state, start, _end, silent) => {
   if (!/^\[toc\]$/i.test(state.src.slice(state.bMarks[start], state.eMarks[start]).trim()))
     return false;
@@ -200,10 +203,10 @@ parser.block.ruler.before('paragraph', 'toc', (state, start, _end, silent) => {
   state.line = start + 1;
   return true;
 });
-parser.renderer.rules.toc = (_tokens, _i, _opts, env: RenderEnv) =>
+parser.renderer.rules.toc = (tokens, i, _opts, env: RenderEnv) =>
   // Depth travels as a class, not an inline style: DOMPurify strips `style` from
   // rendered Markdown, which flattened every entry to the same indent.
-  `<nav class="toc-preview">${(env.headings || [])
+  `<nav${copyMarker(tokens[i])} class="toc-preview">${(env.headings || [])
     .map(
       (h) =>
         `<a class="toc-level-${Math.min(6, Math.max(1, h.level))}" href="#${h.id}">${escapeHTML(h.text)}</a>`,
@@ -224,6 +227,11 @@ parser.renderer.rules.image = (tokens, i, _options, env: RenderEnv) => {
   }
   return `<span class="image-unloaded">${escapeHTML(t('图片：'))}${escapeHTML(alt || src)}${/^https?:/i.test(src) ? t(' · 网络图片未启用') : ''}</span>`;
 };
+for (const rule of ['fence', 'code_block']) {
+  const render = parser.renderer.rules[rule]!;
+  parser.renderer.rules[rule] = (tokens, i, options, env, self) =>
+    render(tokens, i, options, env, self).replace(/^<pre\b/, '<pre' + copyMarker(tokens[i]));
+}
 export function headings(content: string): Heading[] {
   const tokens = parser.parse(content, {}),
     seen = new Map<string, number>();
@@ -254,6 +262,21 @@ export function renderMarkdown(content: string, env: RenderEnv = {}) {
 }
 export function renderTokens(tokens: any[], env: RenderEnv = {}) {
   const hs = env.headings || [];
+  const sourceMarkers = new Map<string, { from: number; to: number }>();
+  if (env.copySource !== undefined) {
+    const starts = [0];
+    for (let i = 0; i < env.copySource.length; i++)
+      if (env.copySource[i] === '\n') starts.push(i + 1);
+    for (const token of tokens)
+      if (token.level === 0 && token.map && token.nesting !== -1) {
+        const id = crypto.randomUUID(),
+          from = starts[token.map[0]] ?? env.copySource.length,
+          to = starts[token.map[1]] ?? env.copySource.length;
+        sourceMarkers.set(id, { from, to });
+        token.meta = { ...token.meta, folioCopyId: id };
+        token.attrSet('data-folio-copy-id', id);
+      }
+  }
   let index = 0;
   for (const token of tokens) {
     if (token.type === 'heading_open')
@@ -303,6 +326,20 @@ export function renderTokens(tokens: any[], env: RenderEnv = {}) {
   );
   const fragment = document.createElement('template');
   fragment.innerHTML = safe;
+  fragment.content
+    .querySelectorAll('[data-folio-copy-from],[data-folio-copy-to]')
+    .forEach((node) => {
+      node.removeAttribute('data-folio-copy-from');
+      node.removeAttribute('data-folio-copy-to');
+    });
+  fragment.content.querySelectorAll<HTMLElement>('[data-folio-copy-id]').forEach((node) => {
+    const source = sourceMarkers.get(node.dataset.folioCopyId || '');
+    node.removeAttribute('data-folio-copy-id');
+    if (source) {
+      node.dataset.folioCopyFrom = String(source.from);
+      node.dataset.folioCopyTo = String(source.to);
+    }
+  });
   // A document may contain HTML, but only controls generated from its image
   // tokens can opt into network requests. Remove authored action attributes.
   fragment.content

@@ -52,6 +52,12 @@ function contextItems(input, t, choose) {
     role('全选', 'selectAll'),
   ];
   if (input.kind === 'text') return editing;
+  editing.splice(
+    5,
+    0,
+    item('复制 Markdown 源码', 'copy-source', input.selection),
+    item('复制带格式文本', 'copy-rich', input.selection),
+  );
   return [
     ...(input.blockKind
       ? [

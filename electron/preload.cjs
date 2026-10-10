@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('folio', {
   desktop: true,
   contextMenu: invoke('context-menu'),
   copyText: invoke('clipboard-write'),
+  copyContent: invoke('clipboard-write-content'),
   exportDiagnostics: invoke('diagnostics-export'),
   diagnosticsSnapshot: invoke('diagnostics-snapshot'),
   agentStatus: invoke('agent-status'),

@@ -51,6 +51,7 @@ import {
   type RenderEnv,
 } from './markdown';
 import { taskToggleChange } from './task-markers.mjs';
+import { registerCopySource } from './reading-copy';
 // Folio binds these chords to its own formatting commands on the document. Left in
 // place, CodeMirror's defaults run first and win: Mod-i selects the enclosing
 // syntax node so "italic" wraps a whole paragraph, Mod-/ comments the line out,
@@ -146,6 +147,7 @@ class BlockWidget extends WidgetType {
       }
       return { from, to: Math.min(view.state.doc.length, from + this.raw.length) };
     };
+    registerCopySource(dom, () => ({ ...locate(), raw: this.raw }));
     if (
       this.type === 'table_open' ||
       this.type === 'math_block' ||

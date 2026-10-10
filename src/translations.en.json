@@ -206,7 +206,6 @@
   "衬线 / 宋体": "Serif",
   "文字大小": "Text size",
   "正文宽度": "Text width",
-  "写作与协作": "Writing and collaboration",
   "自动保存": "Autosave",
   "停止输入 1.5 秒后保存；冲突时暂停。": "Save after 1.5 seconds of inactivity. Pause when there is a conflict.",
   "所有外部修改先审阅": "Review all external changes",
@@ -219,7 +218,6 @@
   "在源码模式显示行号与折叠标记。": "Show line numbers and fold controls in source mode.",
   "加载网络图片": "Load remote images",
   "开启后，图片来源网站会收到加载请求。": "When enabled, image hosts receive requests to load images.",
-  "· 本地 Markdown 编辑器": "· Local Markdown editor",
   "文档以纯文本保存，历史与恢复草稿保存在应用数据目录。": "Documents are plain text. History and recovery drafts are stored in the app data folder.",
   "检查更新…": "Check for updates…",
   "快速打开": "Quick open",
@@ -1097,5 +1095,15 @@
   "复制内容无效或过长。": "The text to copy is invalid or too large.",
   "返回设置": "Back to settings",
   "关闭并返回设置": "Close and return to settings",
-  "启用网络图片": "Enable remote images"
+  "启用网络图片": "Enable remote images",
+  "设置": "Settings",
+  "设置分类": "Settings categories",
+  "AI 记忆": "AI memory",
+  "关于与更新": "About and updates",
+  "默认复制格式": "Default copy format",
+  "带格式文本": "Rich text",
+  "Markdown 源码": "Markdown source",
+  "用于阅读模式的 ⌘C。右键菜单始终提供两种格式。": "Applies to ⌘C in reading mode. Both formats are always available in the context menu.",
+  "复制 Markdown 源码": "Copy Markdown source",
+  "复制带格式文本": "Copy rich text"
 }

@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 
-async function verifyContextMenu(window, choose, marker, copied) {
+async function verifyContextMenu(window, choose, marker, copied, rich, original, language) {
   const web = window.webContents;
   const evaluate = (fn, ...args) =>
     web.executeJavaScript(`(${fn})(${args.map(JSON.stringify).join(',')})`);
@@ -68,12 +68,24 @@ async function verifyContextMenu(window, choose, marker, copied) {
   assert.equal(await evaluate(() => window.getSelection().toString()), renderedSelection.text);
   await evaluate(() => document.querySelector('.view-switch button:last-child').click());
   await wait(() => !!document.querySelector('.reading-article'));
+  await wait(
+    () =>
+      document.querySelector('.reading-article [data-math-source]')?.dataset.mathReady === 'true',
+  );
   await rightClick('.reading-article', 'select-document');
   assert(await evaluate((marker) => window.getSelection().toString().includes(marker), marker));
   assert.equal(await evaluate(() => window.getSelection().toString().includes('workspace')), false);
   const readingSelection = await evaluate(() => window.getSelection().toString());
   await rightClick('.reading-article', 'copy-preview');
   assert.equal(copied().at(-1), readingSelection);
+  await require('./desktop-copy-check.cjs').verifyReadingCopy(
+    window,
+    choose,
+    copied,
+    rich,
+    original,
+    language,
+  );
   await rightClick('.project-document-row', 'reveal');
   assert.equal(await evaluate(() => !!document.querySelector('.modal-backdrop')), false);
   await rightClick('.reading-article', 'edit-source');

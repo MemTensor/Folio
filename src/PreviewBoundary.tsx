@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { renderMarkdown } from './markdown';
+import { registerCopySource } from './reading-copy';
 
 export class PreviewBoundary extends Component<
   { resetKey: string; onSource: () => void; children: ReactNode },
@@ -44,9 +45,20 @@ export const ReadingContent = memo(
     ComponentPropsWithoutRef<'article'> & { content: string; path: string; remoteImages: boolean }
   >(({ content, path, remoteImages, ...props }, ref) => {
     const html = useMemo(
-      () => renderMarkdown(content, { path, remoteImages, imageControls: true }),
+      () =>
+        renderMarkdown(content, { path, remoteImages, imageControls: true, copySource: content }),
       [content, path, remoteImages],
     );
-    return <article {...props} ref={ref} dangerouslySetInnerHTML={{ __html: html }} />;
+    return (
+      <article
+        {...props}
+        ref={(node) => {
+          if (node) registerCopySource(node, () => ({ from: 0, to: content.length, raw: content }));
+          if (typeof ref === 'function') ref(node);
+          else if (ref) ref.current = node;
+        }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
   }),
 );

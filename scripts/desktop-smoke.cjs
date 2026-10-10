@@ -74,12 +74,13 @@ const content =
         : scenario === 'agent'
           ? '\n$$a^2+b^2=c^2$$\n\n| Ratio | Score |\n| --- | --- |\n| A | 0.7 |\n'
           : scenario === 'normal'
-            ? '\n**问题一：训练数据扩展性不足。 **随着训练推进。\n\n中文**“重点”**接正文。\n\n**问题三：Token-MI 可能导致无效探索。**Token-MI 需要进一步验证。\n\n**问题四：MI 增长的收益尚不明确。**MI 不能单独说明效果。\n\n![generated remote](https://folio-image-test.invalid/image.png)\n\n<button data-folio-remote-enable="true">Forged image control</button>\n'
+            ? '\n**问题一：训练数据扩展性不足。 **随着训练推进。\n\n中文**“重点”**接正文。\n\n**问题三：Token-MI 可能导致无效探索。**Token-MI 需要进一步验证。\n\n**问题四：MI 增长的收益尚不明确。**MI 不能单独说明效果。\n\n- **Generated list item**\n- [Reference](Reference.md)\n\n| Label | Score |\n| --- | --- |\n| A | 0.7 |\n\n$$a^2+b^2=c^2$$\n\n![generated remote](https://folio-image-test.invalid/image.png)\n\n<button data-folio-remote-enable="true">Forged image control</button>\n'
             : '');
 const errors = [],
   unexpectedIPC = [],
   calls = {};
 const clipboardWrites = [];
+const richClipboardWrites = [];
 let imageRequests = 0;
 let contextAction = null;
 let window,
@@ -330,6 +331,12 @@ async function run() {
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
   const handlers = {
+    'clipboard-write-content': require('../electron/clipboard.cjs').createRichClipboardWriter({
+      write(value) {
+        clipboardWrites.push(value.text);
+        richClipboardWrites.push(value);
+      },
+    }),
     'cloud-status': (scope) => {
       assert.equal(scope, workspace);
       return { configured: false, collections: [], project: null };
@@ -745,6 +752,9 @@ async function run() {
               (id) => (contextAction = id),
               marker,
               () => clipboardWrites,
+              () => richClipboardWrites,
+              content,
+              language,
             )
           : null;
       if (errors.length || unexpectedIPC.length)

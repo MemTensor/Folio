@@ -81,6 +81,15 @@ const demo: Bridge = {
   exportDiagnostics: unavailable,
   diagnosticsSnapshot: unavailable,
   copyText: (text) => navigator.clipboard.writeText(text),
+  copyContent: async ({ text, html }) => {
+    if (!html) return navigator.clipboard.writeText(text);
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+        'text/html': new Blob([html], { type: 'text/html' }),
+      }),
+    ]);
+  },
   agentStatus: async () => ({ phase: 'idle', models: [] }),
   agentContext: async () => {},
   agentHints: async ({ path }) => ({ key: '', path, phase: 'unavailable', summary: '', hints: [] }),

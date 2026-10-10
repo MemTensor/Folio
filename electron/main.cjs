@@ -207,7 +207,7 @@ function handle(name, fn) {
         name.startsWith('agent-') ||
         name.startsWith('diagnostics-') ||
         name === 'context-menu' ||
-        name === 'clipboard-write') &&
+        name.startsWith('clipboard-write')) &&
       event.senderFrame?.frameTreeNodeId !== win.webContents.mainFrame.frameTreeNodeId
     )
       throw Error(
@@ -233,6 +233,10 @@ async function init() {
   });
   diagnostics.record('app-start');
   handle('clipboard-write', require('./clipboard.cjs').createClipboardWriter(clipboard));
+  handle(
+    'clipboard-write-content',
+    require('./clipboard.cjs').createRichClipboardWriter(clipboard),
+  );
   handle('diagnostics-snapshot', () => diagnostics.snapshot());
   handle('diagnostics-export', async () => {
     const snapshot = await diagnostics.snapshot();

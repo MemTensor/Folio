@@ -29,7 +29,7 @@
 | --- | --- |
 | 跨项目管理 | 常用项目、置顶、最近文档与跨项目标签；文档列表支持名称筛选、排序和目录定位 |
 | 查找原文 | 搜索文件名与正文，按项目筛选，同名文档标明归属 |
-| 阅读与写作 | 在同一区域切换写作、源码、阅读；支持主题、专注和打字机模式 |
+| 阅读与写作 | 在同一区域切换写作、源码、阅读；支持主题、专注和打字机模式；阅读复制可选 Markdown 源码或带格式文本 |
 | 公式、图与表 | LaTeX、Mermaid、图片与表格的预览和编辑；支持 PDF、HTML、Word 导出 |
 | 文件协作 | 接收外部修改，保留未保存草稿，比较、合并和逐处审阅；恢复标签与历史版本 |
 | 原生右键 | 正文格式、公式／图表／表格编辑、文档路径与重命名、标签保存与关闭 |
@@ -40,7 +40,7 @@
 
 ### 安装桌面应用
 
-**[下载 Folio v0.5.0-beta.19 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.19/Folio-0.5.0-beta.19-arm64-mac.zip)** · [版本说明](CHANGELOG.md)
+**[下载 Folio v0.5.0-beta.20 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.20/Folio-0.5.0-beta.20-arm64-mac.zip)** · [版本说明](CHANGELOG.md)
 
 解压，将 `Folio.app` 放入应用程序文件夹，然后打开 Markdown 文件或项目目录。
 

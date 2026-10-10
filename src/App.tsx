@@ -1,4 +1,4 @@
-import { ProjectHome, ProjectSettings, FirstRun } from './ProjectHome';
+import { ProjectHome, FirstRun } from './ProjectHome';
 import { t, getLocale, setLocale, subscribeLocale, localeTag, errorMessage } from './i18n';
 import './projects.css';
 import { DingTalkPanel } from './DingTalkPanel';
@@ -15,6 +15,9 @@ import { RichEditor } from './RichEditor';
 import { UpdatePanel } from './UpdatePanel';
 import { AgentPanel, type AgentContext } from './AgentPanel';
 import { AgentSettings } from './AgentSettings';
+import { SettingsPanel } from './SettingsPanel';
+import { defaults, type Prefs } from './preferences';
+import { copySelection, clipboardPayload } from './reading-copy';
 import { receiveAgentConnection } from './agent-connection.mjs';
 import { applyAgentEdits } from '../core/agent-edit.mjs';
 import {
@@ -36,15 +39,7 @@ import {
   richEditChange,
   blocksRichCommand,
 } from './document-state.mjs';
-import {
-  useState,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useMemo,
-  type ReactNode,
-  type CSSProperties,
-} from 'react';
+import { useState, useEffect, useRef, useMemo, type ReactNode, type CSSProperties } from 'react';
 import {
   SidebarSimple,
   FileText,
@@ -71,9 +66,6 @@ import {
   Table,
   Quotes,
   CheckSquare,
-  Sun,
-  Moon,
-  Leaf,
   Command,
   Copy,
   ArrowCounterClockwise,
@@ -130,32 +122,6 @@ interface Doc {
   error?: string;
   restorePending?: boolean;
 }
-interface Prefs {
-  theme: 'light' | 'sepia' | 'dark';
-  font: 'sans' | 'serif';
-  fontSize: number;
-  width: number;
-  autoSave: boolean;
-  focus: boolean;
-  typewriter: boolean;
-  spellcheck: boolean;
-  remoteImages: boolean;
-  lineNumbers: boolean;
-  reviewExternal: boolean;
-}
-const defaults: Prefs = {
-  theme: 'light',
-  font: 'sans',
-  fontSize: 16,
-  width: 860,
-  autoSave: true,
-  focus: false,
-  typewriter: false,
-  spellcheck: true,
-  remoteImages: false,
-  lineNumbers: true,
-  reviewExternal: false,
-};
 const nameOf = (p: string) => p.split('/').pop() || p;
 const flatten = (nodes: TreeNode[]): TreeNode[] =>
   nodes.flatMap((n) => (n.kind === 'file' ? [n] : flatten(n.children || [])));
@@ -433,7 +399,12 @@ export default function App() {
 
   const [prefs, setPrefs] = useState<Prefs>(() => {
     try {
-      return { ...defaults, ...JSON.parse(localStorage.getItem('folio-preferences') || '{}') };
+      const saved = JSON.parse(localStorage.getItem('folio-preferences') || '{}');
+      return {
+        ...defaults,
+        ...saved,
+        readingCopy: saved.readingCopy === 'source' ? 'source' : 'rich',
+      };
     } catch {
       return defaults;
     }
@@ -493,29 +464,6 @@ export default function App() {
   const [quickFiles, setQuickFiles] = useState<{ path: string; name: string }[] | null>(null),
     [quickBusy, setQuickBusy] = useState(false),
     [quickError, setQuickError] = useState('');
-  const [settingsPage, setSettingsPage] = useState<'agent' | 'memory' | 'updates' | null>(null);
-  const settingsReturn = useRef<HTMLButtonElement | null>(null),
-    settingsScroll = useRef(0);
-  function openSettingsPage(page: 'agent' | 'memory' | 'updates', button: HTMLButtonElement) {
-    settingsReturn.current = button;
-    settingsScroll.current = button.closest('.modal')?.scrollTop || 0;
-    setSettingsPage(page);
-  }
-  function closeSettingsPage() {
-    if (!updatePreparation.current) setSettingsPage(null);
-  }
-  useLayoutEffect(() => {
-    if (modal !== 'settings') {
-      setSettingsPage(null);
-      return;
-    }
-    const dialog = document.querySelector<HTMLElement>('.settings-dialog');
-    if (dialog) dialog.scrollTop = settingsPage ? 0 : settingsScroll.current;
-    if (settingsPage)
-      dialog?.querySelector<HTMLButtonElement>('.settings-back')?.focus({ preventScroll: true });
-    else if (settingsReturn.current?.isConnected)
-      settingsReturn.current.focus({ preventScroll: true });
-  }, [modal, settingsPage]);
   const [updateState, setUpdateState] = useState<UpdateState | null>(null),
     [installingUpdate, setInstallingUpdate] = useState(false);
   const updateStateRef = useRef<UpdateState | null>(null),
@@ -1173,6 +1121,37 @@ export default function App() {
     }
   }, [effectiveMode, active, doc?.content, prefs.theme]);
   useEffect(() => {
+    if (effectiveMode !== 'read') return;
+    const copy = (event: ClipboardEvent) => {
+      const target = event.target instanceof Element ? event.target : document.activeElement;
+      if (
+        target?.closest('input,textarea,[contenteditable="true"]') ||
+        document.activeElement?.closest('input,textarea,[contenteditable="true"]') ||
+        reader.current?.closest('[inert]') ||
+        document.querySelector('.modal-backdrop')
+      )
+        return;
+      const current = docsRef.current[activeRef.current];
+      if (!reader.current || !current || !event.clipboardData) return;
+      try {
+        const selected = copySelection(reader.current, current.content);
+        if (!selected) return;
+        event.preventDefault();
+        const content = clipboardPayload(
+          selected,
+          prefRef.current.readingCopy === 'source' ? 'source' : 'rich',
+        );
+        event.clipboardData.setData('text/plain', content.text);
+        if ('html' in content) event.clipboardData.setData('text/html', content.html!);
+      } catch (error) {
+        event.preventDefault();
+        fail(error);
+      }
+    };
+    document.addEventListener('copy', copy, true);
+    return () => document.removeEventListener('copy', copy, true);
+  }, [effectiveMode]);
+  useEffect(() => {
     if (!prefs.autoSave) {
       timers.current.forEach(clearTimeout);
       timers.current.clear();
@@ -1480,8 +1459,28 @@ export default function App() {
       : undefined;
     const selection = editable
       ? !view!.state.selection.main.empty
-      : !!(native?.toString() && native.anchorNode && surface.contains(native.anchorNode));
+      : !!(
+          native &&
+          !native.isCollapsed &&
+          native.anchorNode &&
+          surface.contains(native.anchorNode)
+        );
     const selectedText = !editable && selection ? native!.toString() : '';
+    const copied =
+      editable && view
+        ? (() => {
+            const markdown = view.state.sliceDoc(
+              view.state.selection.main.from,
+              view.state.selection.main.to,
+            );
+            const holder = document.createElement('div');
+            holder.innerHTML = renderMarkdown(markdown, { path: p });
+            return { markdown, html: holder.innerHTML, text: holder.textContent || markdown };
+          })()
+        : copySelection(
+            effectiveMode === 'read' && reader.current ? reader.current : surface,
+            doc.content,
+          );
     const id = await bridge.contextMenu({
       kind: 'document',
       path: p,
@@ -1494,7 +1493,22 @@ export default function App() {
       notify(t('文档已变化，请重新打开右键菜单。'));
       return;
     }
-    if (id === 'copy-preview') {
+    if (
+      id === 'copy-source' ||
+      id === 'copy-rich' ||
+      (id === 'copy-preview' && effectiveMode === 'read')
+    ) {
+      if (copied)
+        await bridge.copyContent(
+          clipboardPayload(
+            copied,
+            id === 'copy-source' ||
+              (id === 'copy-preview' && prefRef.current.readingCopy === 'source')
+              ? 'source'
+              : 'rich',
+          ),
+        );
+    } else if (id === 'copy-preview') {
       if (selectedText) await bridge.copyText(selectedText);
     } else if (id === 'edit-block' && block?.isConnected)
       (block.querySelector('.table-edit-button') as HTMLButtonElement | null)?.click();
@@ -2924,166 +2938,27 @@ export default function App() {
         </Modal>
       )}
       {modal === 'settings' && (
-        <Modal
-          title={
-            settingsPage === 'agent'
-              ? t('Agent 设置')
-              : settingsPage === 'memory'
-                ? t('AI 记忆设置')
-                : settingsPage === 'updates'
-                  ? t('检查更新')
-                  : t('写作设置')
-          }
-          className="settings-dialog"
-          onClose={settingsPage ? closeSettingsPage : () => setModal(null)}
-          onBack={settingsPage ? closeSettingsPage : undefined}
-          closeLabel={settingsPage ? t('关闭并返回设置') : undefined}
-        >
-          {settingsPage === 'agent' && <AgentSettings />}
-          {settingsPage === 'memory' && <MemorySettings workspace={root} />}
-          {settingsPage === 'updates' && (
-            <UpdatePanel
-              status={updateState}
-              installing={installingUpdate}
-              onInstall={installUpdate}
-            />
-          )}
-          <div className="settings-body" hidden={settingsPage !== null}>
-            <div className="settings-label">{t('外观')}</div>
-            <div className="theme-options">
-              {(['light', 'sepia', 'dark'] as const).map((theme, i) => (
-                <button
-                  key={theme}
-                  className={(prefs.theme === theme ? 'selected ' : '') + 'theme-' + theme}
-                  onClick={() => setPrefs((p) => ({ ...p, theme: theme }))}
-                >
-                  {i === 0 ? <Sun /> : i === 1 ? <Leaf /> : <Moon />}
-                  {[t('纸白'), t('暖纸'), t('夜色')][i]}
-                  {prefs.theme === theme && <Check size={14} />}
-                </button>
-              ))}
-            </div>
-            <label className="setting-row">
-              <span>{t('正文字体')}</span>
-              <select
-                value={prefs.font}
-                onChange={(e) => setPrefs((p) => ({ ...p, font: e.target.value as Prefs['font'] }))}
-              >
-                <option value="sans">{t('系统无衬线')}</option>
-                <option value="serif">{t('衬线 / 宋体')}</option>
-              </select>
-            </label>
-            <label className="setting-row">
-              <span>{t('文字大小')}</span>
-              <input
-                aria-label={t('文字大小')}
-                type="range"
-                min="14"
-                max="24"
-                value={prefs.fontSize}
-                onChange={(e) => setPrefs((p) => ({ ...p, fontSize: Number(e.target.value) }))}
-              />
-              <output>{prefs.fontSize}</output>
-            </label>
-            <label className="setting-row">
-              <span>{t('正文宽度')}</span>
-              <input
-                aria-label={t('正文宽度')}
-                type="range"
-                min="600"
-                max="1000"
-                step="20"
-                value={prefs.width}
-                onChange={(e) => setPrefs((p) => ({ ...p, width: Number(e.target.value) }))}
-              />
-              <output>{prefs.width}</output>
-            </label>
-            {projectData && (
-              <>
-                <div className="settings-label">{t('项目与同步')}</div>
-                <ProjectSettings data={projectData} onChange={setProjectData} />
-                <button
-                  className="full"
-                  onClick={() => {
-                    setModal(null);
-                    setProjectData({
-                      ...projectData,
-                      preferences: { ...projectData.preferences, onboarded: false },
-                    });
-                  }}
-                >
-                  {t('重新查看引导')}
-                </button>
-              </>
-            )}
-            <div className="settings-label">{t('写作与协作')}</div>
-            <button
-              className="full"
-              onClick={(event) => openSettingsPage('agent', event.currentTarget)}
-            >
-              {t('Agent 设置')}
-            </button>
-            <button
-              className="full"
-              onClick={(event) => openSettingsPage('memory', event.currentTarget)}
-            >
-              {t('AI 记忆设置')}
-            </button>
-            {(
-              [
-                ['autoSave', t('自动保存'), t('停止输入 1.5 秒后保存；冲突时暂停。')],
-                ['reviewExternal', t('所有外部修改先审阅'), t('关闭时，未编辑的文件自动同步。')],
-                ['focus', t('专注模式'), t('淡化当前编辑段落以外的内容。')],
-                ['typewriter', t('打字机模式'), t('输入时让光标保持在屏幕中部。')],
-                ['spellcheck', t('拼写检查'), t('使用系统拼写检查。')],
-                ['lineNumbers', t('源码行号'), t('在源码模式显示行号与折叠标记。')],
-                ['remoteImages', t('加载网络图片'), t('开启后，图片来源网站会收到加载请求。')],
-              ] as const
-            ).map(([k, label, description]) => (
-              <label className="toggle-row settings-toggle" key={k}>
-                <span>
-                  <strong>{label}</strong>
-                  <small>{description}</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={prefs[k]}
-                  onChange={(e) => setPrefs((p) => ({ ...p, [k]: e.target.checked }))}
-                />
-              </label>
-            ))}
-            <div className="settings-note">
-              Folio {updateState?.currentVersion || '…'} {t('· 本地 Markdown 编辑器')}
-              <br />
-              {t('文档以纯文本保存，历史与恢复草稿保存在应用数据目录。')}
-              <br />
-              <button onClick={(event) => openSettingsPage('updates', event.currentTarget)}>
-                {t('检查更新…')}
-              </button>
-              <span> · </span>
-              <button
-                onClick={() =>
-                  guarded(async () => {
-                    if (await bridge.exportDiagnostics()) notify(t('诊断信息已导出。'));
-                  })
-                }
-              >
-                {t('导出诊断信息')}
-              </button>
-              <span> · </span>
-              <button
-                onClick={() =>
-                  guarded(async () => {
-                    await bridge.copyText(await bridge.diagnosticsSnapshot());
-                    notify(t('诊断信息已复制。'));
-                  })
-                }
-              >
-                {t('复制诊断信息')}
-              </button>
-            </div>
-          </div>
-        </Modal>
+        <SettingsPanel
+          prefs={prefs}
+          setPrefs={setPrefs}
+          projectData={projectData}
+          setProjectData={setProjectData}
+          root={root}
+          updateState={updateState}
+          installing={installingUpdate}
+          onInstall={installUpdate}
+          onClose={() => setModal(null)}
+          onNotice={notify}
+          onError={fail}
+          onGuide={() => {
+            setModal(null);
+            if (projectData)
+              setProjectData({
+                ...projectData,
+                preferences: { ...projectData.preferences, onboarded: false },
+              });
+          }}
+        />
       )}
       {(modal === 'quick' || modal === 'commands') && (
         <Modal

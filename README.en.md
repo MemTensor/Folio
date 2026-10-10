@@ -22,7 +22,7 @@ Original documents stay ordinary Markdown, with existing folders, relative asset
 | --- | --- |
 | Across projects | Pinned projects, recent documents and project tabs; filter and sort documents with folder context |
 | Find sources | Search file names and document text, filter by project and distinguish same-name files |
-| Read and write | Writing, source and reading in one editor; themes, focus and typewriter modes |
+| Read and write | Writing, source and reading in one editor; themes, focus and typewriter modes; copy Markdown source or rich text while reading |
 | Technical content | Preview and edit LaTeX, Mermaid, images and tables; export PDF, HTML or Word |
 | File collaboration | Receive external changes, retain unsaved drafts, compare and merge edits, restore tabs and history |
 | Native context menus | Text formatting, formula / diagram / table editors, document paths, rename, save and close tabs |
@@ -31,7 +31,7 @@ Optional project discovery reads local Codex / Claude Code project records. File
 
 ## Get started
 
-**[Download v0.5.0-beta.19 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.19/Folio-0.5.0-beta.19-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
+**[Download v0.5.0-beta.20 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.20/Folio-0.5.0-beta.20-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
 
 Unzip and move `Folio.app` to Applications, then open a Markdown file or project folder.
 

@@ -53,68 +53,67 @@ async function verifyPreferences(window, language, imageRequests, capturePath) {
   }
   await click('.app', labels.settings);
   await wait(() => !!document.querySelector('.settings-dialog'));
-  const overview = await evaluate(() => {
-    const dialog = document.querySelector('.settings-dialog');
-    dialog.scrollTop = 120;
-    return {
-      scroll: dialog.scrollTop,
-      font: document.querySelector('input[aria-label="文字大小"],input[aria-label="Text size"]')
-        ?.value,
-    };
-  });
-  await click('.settings-body', labels.agent);
-  await wait(
-    () => !!document.querySelector('.settings-back') && !!document.querySelector('.agent-settings'),
+  const layout = await evaluate(() => ({
+    count: document.querySelectorAll('.settings-sidebar button').length,
+    nav: document.querySelector('.settings-sidebar').getBoundingClientRect().right,
+    content: document.querySelector('.settings-content').getBoundingClientRect().left,
+    height: document.querySelector('.settings-dialog').getBoundingClientRect().height,
+  }));
+  assert.equal(layout.count, 7);
+  assert(layout.nav <= layout.content);
+  assert(layout.height <= 600);
+  const font = await evaluate(
+    () =>
+      document.querySelector('input[aria-label="文字大小"],input[aria-label="Text size"]').value,
   );
+  await evaluate(() => document.querySelector('[data-settings-section="agent"]').click());
+  await wait(() => !!document.querySelector('.agent-settings'));
   assert.equal(await evaluate(() => document.querySelectorAll('.modal-backdrop').length), 1);
-  assert.equal(await evaluate(() => document.querySelector('.settings-body').hidden), true);
-  assert.equal(
-    await evaluate(() => getComputedStyle(document.querySelector('.settings-body')).display),
-    'none',
-  );
-  assert.equal(
-    await evaluate(() => document.querySelector('.modal-heading h2').textContent),
-    labels.agent,
-  );
   await capture('-settings-agent');
   web.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
   web.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
   await wait(
-    () =>
-      !!document.querySelector('.settings-body') &&
-      !document.querySelector('.settings-body').hidden &&
-      !document.querySelector('.agent-settings'),
+    () => document.querySelector('.settings-content').dataset.settingsPage === 'appearance',
   );
-  assert.equal(
-    await evaluate(() => document.querySelector('.settings-dialog').scrollTop),
-    overview.scroll,
-  );
-  assert.equal(await evaluate(() => document.activeElement.textContent.trim()), labels.agent);
   assert.equal(
     await evaluate(
       () =>
-        document.querySelector('input[aria-label="文字大小"],input[aria-label="Text size"]')?.value,
+        document.querySelector('input[aria-label="文字大小"],input[aria-label="Text size"]').value,
     ),
-    overview.font,
+    font,
   );
-  await click('.settings-body', labels.agent);
-  await wait(() => !!document.querySelector('.agent-settings'));
-  await click('.modal-heading', labels.closeBack);
-  await wait(() => !document.querySelector('.settings-body').hidden);
   await capture('-settings-parent');
-  for (const [label, selector] of [
-    [en ? 'AI memory settings' : 'AI 记忆设置', '.memory-settings'],
-    [en ? 'Check for updates…' : '检查更新…', '.update-panel'],
+  for (const [section, selector] of [
+    ['memory', '.memory-settings'],
+    ['about', '.update-panel'],
   ]) {
-    await click('.settings-body', label);
+    await evaluate(
+      (section) => document.querySelector('[data-settings-section="' + section + '"]').click(),
+      section,
+    );
     await wait((selector) => !!document.querySelector(selector), selector);
     await click('.modal-heading', labels.back);
     await wait(
-      (selector) =>
-        !document.querySelector('.settings-body').hidden && !document.querySelector(selector),
-      selector,
+      () => document.querySelector('.settings-content').dataset.settingsPage === 'appearance',
     );
   }
+  await evaluate(() => document.querySelector('[data-settings-section="reading"]').click());
+  await wait(
+    () =>
+      !!document.querySelector(
+        'select[aria-label="默认复制格式"],select[aria-label="Default copy format"]',
+      ),
+  );
+  assert.equal(
+    await evaluate(
+      () =>
+        document.querySelector(
+          'select[aria-label="默认复制格式"],select[aria-label="Default copy format"]',
+        ).value,
+    ),
+    'rich',
+  );
+  await capture('-settings-reading');
   await click('.modal-heading', labels.close);
   await wait(() => !document.querySelector('.modal-backdrop'));
   assert.equal(imageRequests(), 0);
@@ -147,6 +146,7 @@ async function verifyPreferences(window, language, imageRequests, capturePath) {
     true,
   );
   await click('.app', labels.settings);
+  await evaluate(() => document.querySelector('[data-settings-section="reading"]').click());
   await evaluate((en) => {
     const label = en ? 'Load remote images' : '加载网络图片';
     const row = [...document.querySelectorAll('.settings-toggle')].find(
