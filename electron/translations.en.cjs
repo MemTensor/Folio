@@ -1,4 +1,8 @@
 module.exports = {
+  返回设置: 'Back to settings',
+  关闭并返回设置: 'Close and return to settings',
+  启用网络图片: 'Enable remote images',
+
   '复制内容无效或过长。': 'The text to copy is invalid or too large.',
   复制诊断信息: 'Copy diagnostics',
   '诊断信息已复制。': 'Diagnostics copied.',

@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 
-async function verifyContextMenu(window, choose, marker) {
+async function verifyContextMenu(window, choose, marker, copied) {
   const web = window.webContents;
   const evaluate = (fn, ...args) =>
     web.executeJavaScript(`(${fn})(${args.map(JSON.stringify).join(',')})`);
@@ -23,11 +23,57 @@ async function verifyContextMenu(window, choose, marker) {
     }, selector);
     await pause();
   }
+  const renderedSelection = await evaluate(() => {
+    const blocks = [...document.querySelectorAll('.md-block.block-paragraph_open')];
+    const first = blocks[0],
+      last = blocks[2];
+    if (!first || !last) throw Error('Rendered paragraph fixtures are missing.');
+    first.focus();
+    const range = document.createRange();
+    range.selectNodeContents(first);
+    const end = document.createRange();
+    end.selectNodeContents(last);
+    range.setEnd(end.endContainer, end.endOffset);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const rect = range.getClientRects()[0];
+    return {
+      text: selection.toString(),
+      x: Math.round(rect.left + 5),
+      y: Math.round(rect.top + rect.height / 2),
+    };
+  });
+  assert(renderedSelection.text.includes(marker));
+  choose('copy-preview');
+  web.focus();
+  web.sendInputEvent({
+    type: 'mouseDown',
+    button: 'right',
+    x: renderedSelection.x,
+    y: renderedSelection.y,
+  });
+  web.sendInputEvent({
+    type: 'mouseUp',
+    button: 'right',
+    x: renderedSelection.x,
+    y: renderedSelection.y,
+  });
+  for (let i = 0; i < 100 && copied().at(-1) !== renderedSelection.text; i++) await pause();
+  assert.equal(
+    copied().at(-1),
+    renderedSelection.text,
+    'A real right-click must copy the existing rendered selection.',
+  );
+  assert.equal(await evaluate(() => window.getSelection().toString()), renderedSelection.text);
   await evaluate(() => document.querySelector('.view-switch button:last-child').click());
   await wait(() => !!document.querySelector('.reading-article'));
   await rightClick('.reading-article', 'select-document');
   assert(await evaluate((marker) => window.getSelection().toString().includes(marker), marker));
   assert.equal(await evaluate(() => window.getSelection().toString().includes('workspace')), false);
+  const readingSelection = await evaluate(() => window.getSelection().toString());
+  await rightClick('.reading-article', 'copy-preview');
+  assert.equal(copied().at(-1), readingSelection);
   await rightClick('.project-document-row', 'reveal');
   assert.equal(await evaluate(() => !!document.querySelector('.modal-backdrop')), false);
   await rightClick('.reading-article', 'edit-source');
@@ -82,6 +128,7 @@ async function verifyContextMenu(window, choose, marker) {
     sourceFormattingUndo: true,
     fileTarget: true,
     draftBeforeClose: true,
+    renderedRightClickCopy: true,
   };
 }
 module.exports = { verifyContextMenu };

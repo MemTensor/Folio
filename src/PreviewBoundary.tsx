@@ -44,7 +44,7 @@ export const ReadingContent = memo(
     ComponentPropsWithoutRef<'article'> & { content: string; path: string; remoteImages: boolean }
   >(({ content, path, remoteImages, ...props }, ref) => {
     const html = useMemo(
-      () => renderMarkdown(content, { path, remoteImages }),
+      () => renderMarkdown(content, { path, remoteImages, imageControls: true }),
       [content, path, remoteImages],
     );
     return <article {...props} ref={ref} dangerouslySetInnerHTML={{ __html: html }} />;

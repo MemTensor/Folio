@@ -15,6 +15,13 @@ export function cjkEmphasis(md) {
       close = scanned.can_close;
     if (!open && cjk.test(before) && punctuation.test(after[0] || '')) open = true;
     if (!close && cjk.test(after) && punctuation.test(before.slice(-1))) close = true;
+    if (
+      !close &&
+      fullwidthPunctuation.test(before.slice(-1)) &&
+      punctuation.test(before.slice(-1)) &&
+      /[\p{L}\p{N}]/u.test(after)
+    )
+      close = true;
     if (!close && /[\t ]$/.test(before)) {
       const trailing = state.src.slice(Math.max(0, state.pos - 34), state.pos);
       const match = /([^\t \n\r])[\t ]{1,32}$/.exec(trailing);

@@ -16,6 +16,7 @@ export { imageURL } from './image-url.mjs';
 export interface RenderEnv {
   path?: string;
   remoteImages?: boolean;
+  imageControls?: boolean;
   headings?: Heading[];
   lineOffset?: number;
 }
@@ -213,9 +214,15 @@ parser.renderer.rules.image = (tokens, i, _options, env: RenderEnv) => {
     src = token.attrGet('src') || '',
     url = imageURL(src, env),
     alt = token.content;
-  return url
-    ? `<img src="${escapeHTML(url)}" alt="${escapeHTML(alt)}" loading="lazy" />`
-    : `<span class="image-unloaded">${escapeHTML(t('图片：'))}${escapeHTML(alt || src)}${/^https?:/.test(src) ? t(' · 网络图片未启用') : ''}</span>`;
+  if (url) return `<img src="${escapeHTML(url)}" alt="${escapeHTML(alt)}" loading="lazy" />`;
+  const markers = (env as RenderEnv & { imageMarkers?: Map<string, { src: string; alt: string }> })
+    .imageMarkers;
+  if (/^https?:/i.test(src) && env.imageControls && markers) {
+    const id = crypto.randomUUID();
+    markers.set(id, { src, alt });
+    return `<span data-folio-remote-image="${id}"></span>`;
+  }
+  return `<span class="image-unloaded">${escapeHTML(t('图片：'))}${escapeHTML(alt || src)}${/^https?:/i.test(src) ? t(' · 网络图片未启用') : ''}</span>`;
 };
 export function headings(content: string): Heading[] {
   const tokens = parser.parse(content, {}),
@@ -263,10 +270,12 @@ export function renderTokens(tokens: any[], env: RenderEnv = {}) {
     }
   }
   const taskMarkers = new Map<string, { offset: number; checked: boolean }>();
+  const imageMarkers = new Map<string, { src: string; alt: string }>();
   const html = parser.renderer.render(tokens, parser.options, {
     ...env,
     headings: hs,
     taskMarkers,
+    imageMarkers,
   });
   const safe = DOMPurify.sanitize(html, {
     ADD_URI_SAFE_ATTR: ['data-source'],
@@ -294,6 +303,36 @@ export function renderTokens(tokens: any[], env: RenderEnv = {}) {
   );
   const fragment = document.createElement('template');
   fragment.innerHTML = safe;
+  // A document may contain HTML, but only controls generated from its image
+  // tokens can opt into network requests. Remove authored action attributes.
+  fragment.content
+    .querySelectorAll('[data-folio-remote-enable]')
+    .forEach((node) => node.removeAttribute('data-folio-remote-enable'));
+  const imagePlaceholder = (src: string, alt: string) => {
+    const placeholder = document.createElement('span');
+    placeholder.className = 'image-unloaded';
+    const remote = /^https?:/i.test(src);
+    const label = document.createElement('span');
+    label.textContent =
+      t('图片：') + (alt || src) + (remote ? t(' · 网络图片未启用') : t(' · 未加载'));
+    placeholder.append(label);
+    if (remote && env.imageControls) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.folioRemoteEnable = 'true';
+      button.textContent = t('启用网络图片');
+      button.title = t('开启后，图片来源网站会收到加载请求。');
+      const note = document.createElement('small');
+      note.textContent = t('开启后，图片来源网站会收到加载请求。');
+      placeholder.append(button, note);
+    }
+    return placeholder;
+  };
+  fragment.content.querySelectorAll<HTMLElement>('[data-folio-remote-image]').forEach((node) => {
+    const image = imageMarkers.get(node.dataset.folioRemoteImage || '');
+    if (image) node.replaceWith(imagePlaceholder(image.src, image.alt));
+    else node.removeAttribute('data-folio-remote-image');
+  });
   fragment.content.querySelectorAll<HTMLElement>('[data-folio-task]').forEach((node) => {
     const marker = taskMarkers.get(node.dataset.folioTask || '');
     if (!marker) {
@@ -313,10 +352,7 @@ export function renderTokens(tokens: any[], env: RenderEnv = {}) {
       url = source.startsWith('folio-asset:') ? source : imageURL(source, env);
     if (url) img.setAttribute('src', url);
     else {
-      const placeholder = document.createElement('span');
-      placeholder.className = 'image-unloaded';
-      placeholder.textContent = t('图片：') + (img.alt || source) + t(' · 未加载');
-      img.replaceWith(placeholder);
+      img.replaceWith(imagePlaceholder(source, img.alt));
     }
   });
   return fragment.innerHTML;

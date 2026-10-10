@@ -9,6 +9,17 @@
   color: var(--text);
   font-size: 12px;
 }
+.agent-settings-disconnect.agent-settings-diagnostics {
+  display: block;
+}
+.agent-settings-diagnostics > span {
+  display: block;
+  margin-bottom: 10px;
+}
+.agent-settings-diagnostics button {
+  white-space: nowrap;
+  margin-right: 8px;
+}
 .agent-heading,
 .agent-heading > div,
 .agent-heading-actions,

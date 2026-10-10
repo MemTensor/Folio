@@ -44,7 +44,9 @@ function contextItems(input, t, choose) {
     role('重做', 'redo', input.editable),
     separator,
     role('剪切', 'cut', input.editable && input.selection),
-    role('复制', 'copy', input.selection),
+    input.kind === 'document' && !input.editable
+      ? item('复制', 'copy-preview', input.selection)
+      : role('复制', 'copy', input.selection),
     role('粘贴', 'paste', input.editable),
     role('粘贴为纯文本', 'pasteAndMatchStyle', input.editable),
     role('全选', 'selectAll'),

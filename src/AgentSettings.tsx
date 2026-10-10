@@ -308,7 +308,7 @@ export function AgentSettings() {
         </p>
       )}
       {bridge.desktop && (
-        <div className="agent-settings-disconnect">
+        <div className="agent-settings-disconnect agent-settings-diagnostics">
           <span>{t('诊断信息仅含运行事件，日志最多约 1 MB；不包含正文、对话或凭据。')}</span>
           <button
             disabled={busy}

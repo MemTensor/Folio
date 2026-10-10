@@ -36,7 +36,15 @@ import {
   richEditChange,
   blocksRichCommand,
 } from './document-state.mjs';
-import { useState, useEffect, useRef, useMemo, type ReactNode, type CSSProperties } from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+  type ReactNode,
+  type CSSProperties,
+} from 'react';
 import {
   SidebarSimple,
   FileText,
@@ -53,6 +61,7 @@ import {
   WarningCircle,
   X,
   CaretDown,
+  CaretLeft,
   ArrowUpRight,
   SlidersHorizontal,
   TextB,
@@ -186,13 +195,21 @@ export function Modal({
   onClose,
   children,
   wide = false,
+  onBack,
+  closeLabel,
+  className = '',
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  onBack?: () => void;
+  closeLabel?: string;
+  className?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     const el = panel.current;
@@ -203,7 +220,7 @@ export function Modal({
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        close.current();
       }
       if (e.key === 'Tab' && el) {
         const all = Array.from(
@@ -242,11 +259,17 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={'modal ' + (wide ? 'wide' : '')}
+        className={'modal ' + (wide ? 'wide ' : '') + className}
       >
         <div className="modal-heading">
+          {onBack && (
+            <button className="settings-back" onClick={onBack}>
+              <CaretLeft size={17} />
+              {t('返回设置')}
+            </button>
+          )}
           <h2>{title}</h2>
-          <IconButton title={t('关闭')} onClick={onClose}>
+          <IconButton title={closeLabel || t('关闭')} onClick={onClose}>
             <X />
           </IconButton>
         </div>
@@ -470,6 +493,29 @@ export default function App() {
   const [quickFiles, setQuickFiles] = useState<{ path: string; name: string }[] | null>(null),
     [quickBusy, setQuickBusy] = useState(false),
     [quickError, setQuickError] = useState('');
+  const [settingsPage, setSettingsPage] = useState<'agent' | 'memory' | 'updates' | null>(null);
+  const settingsReturn = useRef<HTMLButtonElement | null>(null),
+    settingsScroll = useRef(0);
+  function openSettingsPage(page: 'agent' | 'memory' | 'updates', button: HTMLButtonElement) {
+    settingsReturn.current = button;
+    settingsScroll.current = button.closest('.modal')?.scrollTop || 0;
+    setSettingsPage(page);
+  }
+  function closeSettingsPage() {
+    if (!updatePreparation.current) setSettingsPage(null);
+  }
+  useLayoutEffect(() => {
+    if (modal !== 'settings') {
+      setSettingsPage(null);
+      return;
+    }
+    const dialog = document.querySelector<HTMLElement>('.settings-dialog');
+    if (dialog) dialog.scrollTop = settingsPage ? 0 : settingsScroll.current;
+    if (settingsPage)
+      dialog?.querySelector<HTMLButtonElement>('.settings-back')?.focus({ preventScroll: true });
+    else if (settingsReturn.current?.isConnected)
+      settingsReturn.current.focus({ preventScroll: true });
+  }, [modal, settingsPage]);
   const [updateState, setUpdateState] = useState<UpdateState | null>(null),
     [installingUpdate, setInstallingUpdate] = useState(false);
   const updateStateRef = useRef<UpdateState | null>(null),
@@ -1435,6 +1481,7 @@ export default function App() {
     const selection = editable
       ? !view!.state.selection.main.empty
       : !!(native?.toString() && native.anchorNode && surface.contains(native.anchorNode));
+    const selectedText = !editable && selection ? native!.toString() : '';
     const id = await bridge.contextMenu({
       kind: 'document',
       path: p,
@@ -1447,7 +1494,9 @@ export default function App() {
       notify(t('文档已变化，请重新打开右键菜单。'));
       return;
     }
-    if (id === 'edit-block' && block?.isConnected)
+    if (id === 'copy-preview') {
+      if (selectedText) await bridge.copyText(selectedText);
+    } else if (id === 'edit-block' && block?.isConnected)
       (block.querySelector('.table-edit-button') as HTMLButtonElement | null)?.click();
     else if (id === 'document-agent') setPanel('agent');
     else if (id === 'edit-source') setMode('source');
@@ -2259,6 +2308,36 @@ export default function App() {
                   data-document-path={active}
                   data-document-revision={doc.revision}
                   data-document-mode={effectiveMode}
+                  onClick={(event) => {
+                    if ((event.target as HTMLElement).closest('button[data-folio-remote-enable]')) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setPrefs((current) => ({ ...current, remoteImages: true }));
+                    }
+                  }}
+                  onMouseDownCapture={(event) => {
+                    if (event.button !== 2) return;
+                    const selection = window.getSelection();
+                    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+                    const range = selection.getRangeAt(0);
+                    if (
+                      !event.currentTarget.contains(range.startContainer) ||
+                      !event.currentTarget.contains(range.endContainer)
+                    )
+                      return;
+                    if (
+                      [...range.getClientRects()].some(
+                        (rect) =>
+                          event.clientX >= rect.left &&
+                          event.clientX <= rect.right &&
+                          event.clientY >= rect.top &&
+                          event.clientY <= rect.bottom,
+                      )
+                    ) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }
+                  }}
                   onContextMenu={(event) => {
                     if (!bridge.desktop || (event.target as HTMLElement).closest('input,textarea'))
                       return;
@@ -2845,8 +2924,31 @@ export default function App() {
         </Modal>
       )}
       {modal === 'settings' && (
-        <Modal title={t('写作设置')} onClose={() => setModal(null)}>
-          <div className="settings-body">
+        <Modal
+          title={
+            settingsPage === 'agent'
+              ? t('Agent 设置')
+              : settingsPage === 'memory'
+                ? t('AI 记忆设置')
+                : settingsPage === 'updates'
+                  ? t('检查更新')
+                  : t('写作设置')
+          }
+          className="settings-dialog"
+          onClose={settingsPage ? closeSettingsPage : () => setModal(null)}
+          onBack={settingsPage ? closeSettingsPage : undefined}
+          closeLabel={settingsPage ? t('关闭并返回设置') : undefined}
+        >
+          {settingsPage === 'agent' && <AgentSettings />}
+          {settingsPage === 'memory' && <MemorySettings workspace={root} />}
+          {settingsPage === 'updates' && (
+            <UpdatePanel
+              status={updateState}
+              installing={installingUpdate}
+              onInstall={installUpdate}
+            />
+          )}
+          <div className="settings-body" hidden={settingsPage !== null}>
             <div className="settings-label">{t('外观')}</div>
             <div className="theme-options">
               {(['light', 'sepia', 'dark'] as const).map((theme, i) => (
@@ -2915,10 +3017,16 @@ export default function App() {
               </>
             )}
             <div className="settings-label">{t('写作与协作')}</div>
-            <button className="full" onClick={() => setModal('agent-settings')}>
+            <button
+              className="full"
+              onClick={(event) => openSettingsPage('agent', event.currentTarget)}
+            >
               {t('Agent 设置')}
             </button>
-            <button className="full" onClick={() => setModal('memory')}>
+            <button
+              className="full"
+              onClick={(event) => openSettingsPage('memory', event.currentTarget)}
+            >
               {t('AI 记忆设置')}
             </button>
             {(
@@ -2949,7 +3057,9 @@ export default function App() {
               <br />
               {t('文档以纯文本保存，历史与恢复草稿保存在应用数据目录。')}
               <br />
-              <button onClick={() => setModal('updates')}>{t('检查更新…')}</button>
+              <button onClick={(event) => openSettingsPage('updates', event.currentTarget)}>
+                {t('检查更新…')}
+              </button>
               <span> · </span>
               <button
                 onClick={() =>

@@ -31,6 +31,9 @@ test('CJK bold tolerates punctuation adjacency and a trailing space without chan
     '中文**“强调”**接正文',
     '**中文重点 **接正文',
     '**85% 降至 3%**，结论保持不变。',
+    '**问题三：Token-MI\u00a0可能导致无效或浅层探索。**Token-MI\u00a0只鼓励轨迹包含更多环境信息。',
+    '**问题四：MI\u00a0增长能否转化为下游收益尚不明确。**MI\u00a0升高只表示轨迹与环境的依赖增强。',
+    '**问题五：Token-MI\u00a0的下游适用范围尚不明确。**Token-MI\u00a0可能更适合 GUI。',
   ]) {
     const tokens = parser.parse(source, {});
     assert.equal(tokens.find((token) => token.type === 'inline').content, source);
@@ -46,6 +49,7 @@ test('CJK compatibility keeps nested formatting, code, escapes, formulas and unm
   assert.doesNotMatch(parser.render(String.raw`\*\*中文。 \*\*`), /<strong>/);
   assert.doesNotMatch(parser.render('**中文未结束'), /<strong>/);
   assert.doesNotMatch(parser.render('**English ** prose'), /<strong>/);
+  assert.doesNotMatch(parser.render('**English.**next'), /<strong>/);
   assert.match(
     parser.render('__standard bold__ and *italic*'),
     /<strong>standard bold<\/strong> and <em>italic<\/em>/,

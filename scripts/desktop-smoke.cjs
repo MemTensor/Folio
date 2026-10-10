@@ -15,6 +15,7 @@ const { verifyTableEditor } = require('./desktop-table-check.cjs');
 const { verifyBlockSelection } = require('./desktop-block-check.cjs');
 const { verifyAgentPanel } = require('./desktop-agent-check.cjs');
 const { verifyContextMenu } = require('./desktop-context-check.cjs');
+const { verifyPreferences } = require('./desktop-preferences-check.cjs');
 const { contextItems } = require('../electron/context-menu.cjs');
 
 const temporary = path.resolve(process.argv[2]),
@@ -73,11 +74,13 @@ const content =
         : scenario === 'agent'
           ? '\n$$a^2+b^2=c^2$$\n\n| Ratio | Score |\n| --- | --- |\n| A | 0.7 |\n'
           : scenario === 'normal'
-            ? '\n**问题一：训练数据扩展性不足。 **随着训练推进。\n\n中文**“重点”**接正文。\n'
+            ? '\n**问题一：训练数据扩展性不足。 **随着训练推进。\n\n中文**“重点”**接正文。\n\n**问题三：Token-MI 可能导致无效探索。**Token-MI 需要进一步验证。\n\n**问题四：MI 增长的收益尚不明确。**MI 不能单独说明效果。\n\n![generated remote](https://folio-image-test.invalid/image.png)\n\n<button data-folio-remote-enable="true">Forged image control</button>\n'
             : '');
 const errors = [],
   unexpectedIPC = [],
   calls = {};
+const clipboardWrites = [];
+let imageRequests = 0;
 let contextAction = null;
 let window,
   finished = false;
@@ -327,11 +330,18 @@ async function run() {
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
   const handlers = {
+    'cloud-status': (scope) => {
+      assert.equal(scope, workspace);
+      return { configured: false, collections: [], project: null };
+    },
     'clipboard-write': require('../electron/clipboard.cjs').createClipboardWriter({
       writeText(text) {
-        const report = JSON.parse(text);
-        assert(report.entries.length > 0);
-        assert(!text.includes(marker) && !text.includes('generated-api-key'));
+        if (text.startsWith('{')) {
+          const report = JSON.parse(text);
+          assert(report.entries.length > 0);
+          assert(!text.includes(marker) && !text.includes('generated-api-key'));
+        } else assert(text.includes(marker));
+        clipboardWrites.push(text);
       },
     }),
     'diagnostics-snapshot': () => diagnostics.snapshot(),
@@ -547,7 +557,23 @@ async function run() {
   session.defaultSession.setPermissionRequestHandler((_web, _permission, callback) =>
     callback(false),
   );
+  protocol.interceptBufferProtocol('https', (request, callback) => {
+    if (request.url !== 'https://folio-image-test.invalid/image.png')
+      return callback({ error: -6 });
+    callback({
+      mimeType: 'image/png',
+      data: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4ceIEAAS0AlkWLoFAAAAAAElFTkSuQmCC',
+        'base64',
+      ),
+    });
+  });
   session.defaultSession.webRequest.onBeforeRequest((request, callback) => {
+    if (request.url === 'https://folio-image-test.invalid/image.png') {
+      imageRequests++;
+      callback({ cancel: false });
+      return;
+    }
     const allowed =
       request.url.startsWith('folio://app/') ||
       request.url.startsWith('data:') ||
@@ -708,9 +734,18 @@ async function run() {
         scenario === 'agent'
           ? await verifyAgentPanel(window, content, capturePath, language)
           : null;
+      const preferences =
+        scenario === 'normal'
+          ? await verifyPreferences(window, language, () => imageRequests, capturePath)
+          : null;
       const contextMenu =
         scenario === 'normal'
-          ? await verifyContextMenu(window, (id) => (contextAction = id), marker)
+          ? await verifyContextMenu(
+              window,
+              (id) => (contextAction = id),
+              marker,
+              () => clipboardWrites,
+            )
           : null;
       if (errors.length || unexpectedIPC.length)
         return finish(false, { observed, tableEditing, blockSelection });
@@ -729,6 +764,7 @@ async function run() {
         ...(blockSelection ? { blockSelection } : {}),
         ...(agentPanel ? { agentPanel } : {}),
         ...(contextMenu ? { contextMenu } : {}),
+        ...(preferences ? { preferences } : {}),
         ...(capturePath ? { capturePath } : {}),
       });
     }

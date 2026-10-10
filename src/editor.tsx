@@ -438,7 +438,7 @@ export function Editor(props: Props) {
       s.mode === 'source'
         ? [...(s.lineNumbers ? [lineNumbers(), foldGutter()] : []), highlightActiveLine()]
         : liveExtension(
-            { path: ref.current.path, remoteImages: s.remoteImages },
+            { path: ref.current.path, remoteImages: s.remoteImages, imageControls: true },
             (s) => ref.current.onLink(s),
             (...args) => ref.current.onTable(...args),
             s.focus,

@@ -13,7 +13,7 @@ test('reading and rendered selections never enable native cut, paste or formatti
     identity,
     () => {},
   );
-  assert.equal(items.find((item) => item.role === 'copy').enabled, true);
+  assert.equal(items.find((item) => item.id === 'copy-preview').enabled, true);
   for (const role of ['cut', 'paste', 'pasteAndMatchStyle'])
     assert.equal(items.find((item) => item.role === role).enabled, false);
   assert.equal(
