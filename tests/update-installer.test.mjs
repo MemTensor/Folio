@@ -619,3 +619,24 @@ test(
     assert((await fs.stat(prunePlan.targetPath)).isDirectory());
   },
 );
+
+test('abort during helper startup cancels and reaps it before removing the staged bundle', async (t) => {
+  const f = await fixture(t);
+  await fs.writeFile(f.helperPath, '#!/bin/sh\nexec /bin/sleep 30\n', { mode: 0o700 });
+  const plan = await f.installer.prepare(await f.archive());
+  const launched = f.installer.launch(plan, { requestId: randomUUID(), parentPid: process.pid });
+  const rejected = assert.rejects(launched);
+  let child;
+  for (let i = 0; i < 200; i++) {
+    child = f.installer.launching.get(plan.id)?.child;
+    if (child) break;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  assert(child, 'generated helper should reach startup');
+  await f.installer.abort(plan);
+  await rejected;
+  assert.equal(child.signalCode, 'SIGTERM');
+  assert.equal(f.installer.launching.size, 0);
+  assert.equal(f.installer.launched.size, 0);
+  await assertUnchanged(f);
+});

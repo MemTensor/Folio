@@ -464,3 +464,16 @@ test('a large project cannot starve the ones queued behind it', async (t) => {
   assert.equal(typeof tmp, 'string');
   assert.equal(typeof dataDir, 'string');
 });
+
+test('a file recreated after both sides deleted it syncs again even with identical bytes', async (t) => {
+  const { sync, root, cloud, project, run } = await setup(t);
+  await put(root, 'note.md', 'same generated content');
+  await sync.configure({ enabled: true, projectIds: [project.id] });
+  await run();
+  await fs.unlink(path.join(root, 'note.md'));
+  await fs.unlink(path.join(cloud, 'note.md'));
+  await run();
+  await put(root, 'note.md', 'same generated content');
+  assert.equal((await run()).uploaded, 1);
+  assert.equal(await read(cloud, 'note.md'), 'same generated content');
+});

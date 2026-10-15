@@ -1,3 +1,4 @@
+import { errorMessage } from './error-message.mjs';
 import { FILE_SORT_OPTIONS } from './sidebar-order.mjs';
 
 /** @typedef {import('./sidebar-order.mjs').FileSortMode} FileSortMode */
@@ -129,8 +130,7 @@ export function createProjectDocumentListing(read, cancelRequest, publish) {
         emit({ ...result, documents: unique });
       }
     } catch (error) {
-      if (ticket === generation)
-        emit({ error: error instanceof Error ? error.message : String(error) });
+      if (ticket === generation) emit({ error: errorMessage(error) });
     } finally {
       if (ticket === generation) {
         loading = false;

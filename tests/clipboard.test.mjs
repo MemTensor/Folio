@@ -33,3 +33,21 @@ test('rich clipboard writes provide both HTML and plain text without accepting o
     assert.throws(() => copy(invalid), { code: 'CLIPBOARD_INPUT' });
   assert.equal(writes.length, 2);
 });
+
+test('a delayed rich copy cannot overwrite a later clipboard operation', async () => {
+  const writes = [];
+  let ready;
+  const pending = new Promise((resolve) => (ready = resolve));
+  const copy = createRichClipboardWriter(
+    { write: (value) => writes.push(value) },
+    async (content) => {
+      await pending;
+      return content;
+    },
+  );
+  const first = copy({ text: 'first', html: '<p>first</p>' });
+  createClipboardWriter({ writeText: (text) => writes.push({ text }) })('newer');
+  ready();
+  await first;
+  assert.deepEqual(writes, [{ text: 'newer' }]);
+});

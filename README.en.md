@@ -31,7 +31,7 @@ Optional project discovery reads local Codex / Claude Code project records. File
 
 ## Get started
 
-**[Download v0.5.0-beta.20 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.20/Folio-0.5.0-beta.20-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
+**[Download v0.5.0-beta.21 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.21/Folio-0.5.0-beta.21-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
 
 Unzip and move `Folio.app` to Applications, then open a Markdown file or project folder.
 

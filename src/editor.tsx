@@ -47,11 +47,12 @@ import {
   renderMarkdown,
   renderTokens,
   renderDiagrams,
-  headings,
+  headingsForTokens,
   type RenderEnv,
 } from './markdown';
 import { taskToggleChange } from './task-markers.mjs';
 import { registerCopySource } from './reading-copy';
+import { documentChanges } from './editor-changes.mjs';
 // Folio binds these chords to its own formatting commands on the document. Left in
 // place, CodeMirror's defaults run first and win: Mod-i selects the enclosing
 // syntax node so "italic" wraps a whole paragraph, Mod-/ comments the line out,
@@ -82,7 +83,7 @@ interface Props {
   revision: number;
   settings: EditorSettings;
   onChange: (text: string) => void;
-  onCursor: (line: number, column: number, selection: string) => void;
+  onCursor: (line: number, column: number) => void;
   onReady: (handle: EditorHandle | null) => void;
   onLink: (href: string) => void;
   onImage: (files: File[]) => void;
@@ -239,7 +240,7 @@ class BlockWidget extends WidgetType {
         const span = locate();
         const change = taskToggleChange(
           view.state.doc.toString(),
-          Number(checkbox.dataset.taskOffset),
+          span.from + Number(checkbox.dataset.taskOffset),
           span.from,
           span.to,
         );
@@ -336,19 +337,39 @@ export function selectedWidgetText(view: EditorView) {
   const widget = element?.closest('.md-block');
   return widget && view.contentDOM.contains(widget) ? selection.toString() : null;
 }
-function liveExtension(
+export function liveExtension(
   env: RenderEnv,
   links: Props['onLink'],
   table: Props['onTable'],
   focus: boolean,
 ): Extension {
+  let parsed:
+    | {
+        doc: EditorState['doc'];
+        tokens: any[];
+        context: any;
+        hs: ReturnType<typeof headingsForTokens>;
+        dependencies: string;
+      }
+    | undefined;
+  let rendered = new Map<string, string>();
   const build = (state: EditorState) => {
-    const text = state.doc.toString(),
-      context: any = {},
-      tokens = parser.parse(text, context),
-      ranges: any[] = [];
+    if (parsed?.doc !== state.doc) {
+      const context: any = {};
+      const tokens = parser.parse(state.doc.toString(), context);
+      const hs = headingsForTokens(tokens);
+      // Footnote numbering depends on surrounding tokens, not just raw text.
+      const dependencies = JSON.stringify(
+        [context.references, context.footnotes, hs.map(({ line, ...h }) => h)],
+        (key, value) => (key === 'map' || key === 'offset' ? undefined : value),
+      );
+      if (parsed?.dependencies !== dependencies) rendered.clear();
+      parsed = { doc: state.doc, tokens, context, hs, dependencies };
+    }
+    const { tokens, context, hs } = parsed;
+    const ranges: any[] = [],
+      nextRendered = new Map<string, string>();
     const active = state.selection.ranges;
-    const hs = headings(text);
     const covered = new Set<number>();
     const intersects = (from: number, to: number) =>
       active.some((s) => s.from <= to && s.to >= from);
@@ -360,6 +381,19 @@ function liveExtension(
       if (start > end || start > state.doc.lines) continue;
       const from = state.doc.line(start).from,
         to = state.doc.line(end).to;
+      const raw = state.sliceDoc(from, to);
+      const key =
+        token.type +
+        '\0' +
+        (token.type === 'heading_open'
+          ? hs.find((h) => h.line === start)?.id
+          : context.footnotes && raw.includes('[^')
+            ? i
+            : '') +
+        '\0' +
+        raw;
+      const priorHTML = rendered.get(key);
+      if (priorHTML !== undefined) nextRendered.set(key, priorHTML);
       for (let n = start; n <= end; n++) covered.add(n);
       if (from === to) continue;
       if (!intersects(from, to)) {
@@ -369,20 +403,12 @@ function liveExtension(
             last++;
           last = Math.min(last + 1, tokens.length);
         }
-        const renderEnv = { ...context, ...env, headings: hs, lineOffset: 0 };
-        const html = renderTokens(tokens.slice(i, last), renderEnv);
+        const renderEnv = { ...context, ...env, headings: hs, lineOffset: 0, blockOffset: from };
+        const html = priorHTML ?? renderTokens(tokens.slice(i, last), renderEnv);
+        nextRendered.set(key, html);
         ranges.push(
           Decoration.replace({
-            widget: new BlockWidget(
-              state.sliceDoc(from, to),
-              from,
-              to,
-              renderEnv,
-              token.type,
-              html,
-              links,
-              table,
-            ),
+            widget: new BlockWidget(raw, from, to, renderEnv, token.type, html, links, table),
             block: true,
           }).range(from, to),
         );
@@ -416,6 +442,7 @@ function liveExtension(
       if (!covered.has(n) && !l.text && !intersects(l.from, l.to))
         ranges.push(Decoration.line({ class: 'cm-blank-line' }).range(l.from));
     }
+    rendered = nextRendered;
     return Decoration.set(ranges, true);
   };
   const field = StateField.define<DecorationSet>({
@@ -432,6 +459,7 @@ export function Editor(props: Props) {
     ref = useRef(props),
     viewRef = useRef<EditorView | null>(null),
     setting = useRef(new Compartment()),
+    undoHistory = useRef(new Compartment()),
     editing = useRef(new Compartment());
   ref.current = props;
   const extensions = () => {
@@ -461,11 +489,7 @@ export function Editor(props: Props) {
       if (u.selectionSet || u.docChanged) {
         const head = u.state.selection.main.head,
           line = u.state.doc.lineAt(head);
-        ref.current.onCursor(
-          line.number,
-          head - line.from + 1,
-          u.state.sliceDoc(u.state.selection.main.from, u.state.selection.main.to),
-        );
+        ref.current.onCursor(line.number, head - line.from + 1);
       }
       if (ref.current.settings.typewriter && (u.docChanged || u.selectionSet))
         requestAnimationFrame(() => {
@@ -476,7 +500,7 @@ export function Editor(props: Props) {
         });
     });
     const base: Extension[] = [
-      history(),
+      undoHistory.current.of(history()),
       drawSelection(),
       dropCursor(),
       ...(ref.current.settings.lightweight
@@ -591,11 +615,7 @@ export function Editor(props: Props) {
     props.onReady(handle);
     const cursor = view.state.selection.main,
       line = view.state.doc.lineAt(cursor.head);
-    props.onCursor(
-      line.number,
-      cursor.head - line.from + 1,
-      view.state.sliceDoc(cursor.from, cursor.to),
-    );
+    props.onCursor(line.number, cursor.head - line.from + 1);
     requestAnimationFrame(() => {
       if (viewRef.current === view) view.scrollDOM.scrollTop = scrolls.get(props.path) || 0;
     });
@@ -616,12 +636,21 @@ export function Editor(props: Props) {
     const view = viewRef.current;
     if (!view) return;
     if (view.state.doc.toString() !== props.content) {
-      const pos = Math.min(view.state.selection.main.head, props.content.length);
+      const update = documentChanges(view.state.doc.toString(), props.content);
+      const scroll = view.scrollDOM.scrollTop;
       view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: props.content },
-        selection: { anchor: pos },
+        changes: update.changes,
+        ...(update.resetHistory
+          ? {
+              selection: { anchor: Math.min(view.state.selection.main.head, props.content.length) },
+              effects: undoHistory.current.reconfigure([]),
+            }
+          : {}),
         annotations: [Transaction.remote.of(true), Transaction.addToHistory.of(false)],
       });
+      if (update.resetHistory)
+        view.dispatch({ effects: undoHistory.current.reconfigure(history()) });
+      view.scrollDOM.scrollTop = scroll;
     }
   }, [props.revision, props.content]);
   useEffect(() => {

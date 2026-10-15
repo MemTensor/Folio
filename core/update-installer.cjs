@@ -247,6 +247,7 @@ class MacUpdateInstaller {
     this.runner = runner;
     this.prepared = new Map();
     this.launched = new Map();
+    this.launching = new Map();
     this.busy = false;
     this.directory = path.join(this.dataDir, 'updates');
     this.currentFile = path.join(this.directory, 'installer-current.json');
@@ -446,8 +447,21 @@ class MacUpdateInstaller {
       throw fail('更新计划无效，请重新下载。');
     if (this.busy) throw fail('另一个更新操作正在进行。', 'UPDATE_BUSY');
     this.busy = true;
+    let finish;
+    const starting = {
+      cancelled: false,
+      child: null,
+      done: new Promise((resolve) => {
+        finish = resolve;
+      }),
+    };
+    this.launching.set(plan.id, starting);
+    const check = () => {
+      if (starting.cancelled) throw fail('更新准备已取消。', 'UPDATE_CANCELED');
+    };
     try {
       await verifyManifest(plan.stagePath, plan.manifestPath, plan.manifestSHA256);
+      check();
       if (
         JSON.stringify(await this.inspectBundle(plan.stagePath, plan.version)) !==
           JSON.stringify(plan.stageIdentity) ||
@@ -470,6 +484,7 @@ class MacUpdateInstaller {
         version: plan.version,
         nonce: plan.nonce,
       });
+      check();
       const helperPid = await new Promise((resolve, reject) => {
         const child = spawn(helper, [plan.planPath], {
           detached: true,
@@ -477,6 +492,7 @@ class MacUpdateInstaller {
           env: { PATH: '/usr/bin:/bin' },
           cwd: plan.transactionDir,
         });
+        starting.child = child;
         let ready = false,
           output = '';
         const timer = setTimeout(() => {
@@ -508,6 +524,7 @@ class MacUpdateInstaller {
           }
         });
       });
+      check();
       this.prepared.delete(plan.id);
       this.launched.set(plan.id, plan);
       return { id: plan.id, requestId, helperPid };
@@ -516,11 +533,22 @@ class MacUpdateInstaller {
       throw error;
     } finally {
       this.busy = false;
+      this.launching.delete(plan.id);
+      finish();
     }
   }
   async abort(prepared) {
     const plan = this.prepared.get(prepared?.id) || this.launched.get(prepared?.id);
     if (plan !== prepared) throw fail('更新计划无效。');
+    const starting = this.launching.get(plan.id);
+    if (starting) {
+      starting.cancelled = true;
+      if (starting.child) {
+        await writeJSON(path.join(plan.transactionDir, 'cancel.json'), { nonce: plan.nonce });
+        starting.child.kill('SIGTERM');
+      }
+      await starting.done;
+    }
     if (this.launched.has(plan.id)) {
       await writeJSON(path.join(plan.transactionDir, 'cancel.json'), { nonce: plan.nonce });
       return;

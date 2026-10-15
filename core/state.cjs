@@ -122,16 +122,37 @@ async function writeRecoverableJSON(
 async function withLock(dataDir, key, fn, { timeout = 10000 } = {}) {
   const parent = path.join(dataDir, 'locks');
   await fs.mkdir(parent, { recursive: true, mode: 0o700 });
+  return require('./process-lock.cjs').withProcessLock(
+    parent,
+    key,
+    (token) => withDirectoryLock(parent, key, fn, timeout, token),
+    timeout,
+  );
+}
+// Keep the directory protocol while older installed CLIs may still be running.
+// Reclamation and acquisition by current clients are serialized by the lease.
+async function withDirectoryLock(parent, key, fn, timeout, token) {
   const lock = path.join(parent, digest(key) + '.lock'),
     start = Date.now();
   let acquired = false;
   while (!acquired) {
+    if (Date.now() - start > timeout)
+      throw Object.assign(Error('另一个 Folio 操作正在处理此文件，请稍后重试。'), { code: 'BUSY' });
     try {
       await fs.mkdir(lock);
       acquired = true;
-      await writeJSON(path.join(lock, 'owner.json'), { pid: process.pid, time: Date.now() });
+      try {
+        await writeJSON(path.join(lock, 'owner.json'), {
+          pid: process.pid,
+          time: Date.now(),
+          token,
+        });
+      } catch (error) {
+        await fs.rm(lock, { recursive: true, force: true });
+        throw error;
+      }
     } catch (e) {
-      if (e.code !== 'EEXIST') throw e;
+      if (acquired || e.code !== 'EEXIST') throw e;
       const owner = await readJSON(path.join(lock, 'owner.json')).catch(() => null);
       let stale = false;
       if (owner?.pid) {
@@ -149,7 +170,9 @@ async function withLock(dataDir, key, fn, { timeout = 10000 } = {}) {
         try {
           await fs.rename(lock, retired);
           await fs.rm(retired, { recursive: true, force: true });
-        } catch {}
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
         continue;
       }
       if (Date.now() - start > timeout) {
@@ -163,7 +186,8 @@ async function withLock(dataDir, key, fn, { timeout = 10000 } = {}) {
   try {
     return await fn();
   } finally {
-    await fs.rm(lock, { recursive: true, force: true });
+    const owner = await readJSON(path.join(lock, 'owner.json'));
+    if (owner?.token === token) await fs.rm(lock, { recursive: true, force: true });
   }
 }
 module.exports = {

@@ -1,3 +1,4 @@
+import { errorMessage } from './error-message.mjs';
 /**
  * A folder owns only its immediate listing. Closing it invalidates in-flight
  * reads and releases its cache; repeated watcher events coalesce to one retry.
@@ -34,8 +35,7 @@ export function createDirectoryListing(read, publish) {
       const result = await read(current.root, current.directory);
       if (ticket === generation) emit({ nodes: result.nodes, limited: result.limited });
     } catch (error) {
-      if (ticket === generation)
-        emit({ error: error instanceof Error ? error.message : String(error) });
+      if (ticket === generation) emit({ error: errorMessage(error) });
     } finally {
       if (ticket === generation) {
         loading = false;

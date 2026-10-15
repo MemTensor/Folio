@@ -285,6 +285,13 @@ class DocumentCatalog {
     for (const target of delta.removed) documents.delete(target);
     for (const doc of delta.documents) documents.set(doc.path, doc);
     const values = [...documents.values()];
+    const updated = new Set(delta.documents.map((doc) => doc.path));
+    values.sort(
+      (a, b) =>
+        Number(updated.has(b.path)) - Number(updated.has(a.path)) ||
+        b.modifiedAt - a.modifiedAt ||
+        a.path.localeCompare(b.path),
+    );
     return {
       ...record,
       documents: values.slice(0, this.limits.maxDocuments),

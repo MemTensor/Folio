@@ -3,6 +3,7 @@ const split = (s) => s.match(/[^\n]*\n|[^\n]+$/g) || [];
 const DIFF_BUDGET = { timeout: 40, maxEditLength: 1024 };
 /** Keep unchanged line bytes. Never guess which mixed-EOL lines survived a large edit. */
 function encodeText(text, { raw = '', eol = 'LF', bom = false, diffBudget = DIFF_BUDGET } = {}) {
+  text = text.replace(/\r\n/g, '\n');
   const prefix = bom ? '\uFEFF' : '',
     original = raw.startsWith('\uFEFF') ? raw.slice(1) : raw;
   const normalized = original.replace(/\r\n/g, '\n');
@@ -41,4 +42,11 @@ function encodeText(text, { raw = '', eol = 'LF', bom = false, diffBudget = DIFF
   }
   return result;
 }
-module.exports = { encodeText, DIFF_BUDGET };
+function preferredEOL(raw) {
+  const crlf = (raw.match(/\r\n/g) || []).length;
+  const lf = (raw.match(/(?<!\r)\n/g) || []).length;
+  return crlf > lf || (crlf === lf && raw.indexOf('\r\n') === raw.indexOf('\n') - 1)
+    ? 'CRLF'
+    : 'LF';
+}
+module.exports = { encodeText, preferredEOL, DIFF_BUDGET };

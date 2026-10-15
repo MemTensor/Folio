@@ -1,4 +1,6 @@
 {
+  "图片复制超时，请稍后重试。": "Copying images timed out. Try again shortly.",
+  "无法准确定位这段选区，请在源码模式中选择。": "This selection cannot be mapped precisely. Select it in source mode.",
   "回复等待超时，指令已保留，可以重试。": "The response timed out. Your instruction was kept; you can retry.",
   "回复内容过长，指令已保留；可以缩小范围后重试。": "The response was too long. Your instruction was kept; narrow the scope and retry.",
   "上次回复因应用退出而中断，指令已保留。": "The previous response was interrupted when the app exited. Your instruction was kept.",

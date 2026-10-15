@@ -69,6 +69,10 @@ $$
 $$
 `;
   await writeFile(path.join(workspace, 'math.md'), markdown);
+  assert.equal((await run(['library', 'add', workspace])).ok, true);
+  const indexed = await run(['library', 'search', 'Offline mathematics']);
+  assert.equal(indexed.data.total, 1);
+  assert.equal(indexed.data.documents[0].match.line, 1);
   const revision = createHash('sha256').update(markdown).digest('hex');
   const result = await run([
     'dingtalk',

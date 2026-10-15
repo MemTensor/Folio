@@ -44,19 +44,8 @@ export function subscribeLocale(listener: () => void): () => void {
  * leaks the channel name, and the wrapper also stops the message from matching
  * any dictionary entry, so an already-translated error comes back Chinese.
  */
-export function errorMessage(value: unknown): string {
-  let raw = value instanceof Error ? value.message : String(value);
-  // The wrapper can nest: stringifying the rejection gives
-  // `Error: Error invoking remote method 'x': Error: <message>`.
-  for (let round = 0; round < 4; round++) {
-    const next = raw
-      .replace(/^[A-Za-z]*Error:\s*/, '')
-      .replace(/^Error invoking remote method '[^']*':\s*/, '');
-    if (next === raw) break;
-    raw = next;
-  }
-  return raw.trim();
-}
+export { errorMessage } from './error-message.mjs';
+
 /**
  * Placeholder text that is written into the user's Markdown, not shown as UI.
  * It deliberately does not go through the translation table: `t()` falls back to

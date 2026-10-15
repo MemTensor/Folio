@@ -887,6 +887,11 @@ class ProjectSync {
             );
             const paths = new Set([...localFiles.files, ...cloudFiles.files]);
             const files = { ...previous.files };
+            // Only a complete scan of both sides can retire a missing baseline.
+            // A one-sided deletion remains in paths and still needs preserving.
+            if (localFiles.complete && cloudFiles.complete)
+              for (const relative of Object.keys(files))
+                if (!paths.has(relative)) delete files[relative];
             const cloudManifest = path.join(cloud, '.folio-project.json');
             const existingManifest = await this.read(() => cloudMetadata(cloudManifest));
             if (existingManifest && existingManifest.id !== cloudId)

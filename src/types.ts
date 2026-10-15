@@ -365,7 +365,7 @@ export interface Bridge {
   exportDiagnostics(): Promise<string | null>;
   diagnosticsSnapshot(): Promise<string>;
   copyText(text: string): Promise<void>;
-  copyContent(content: { text: string; html?: string }): Promise<void>;
+  copyContent(content: { text: string; html?: string }, documentPath?: string): Promise<void>;
   contextMenu(input: {
     kind: 'document' | 'file' | 'tab' | 'text';
     path?: string;

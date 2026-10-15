@@ -1,4 +1,4 @@
-import { t } from './i18n';
+import { t, errorMessage } from './i18n';
 import { useEffect, useState } from 'react';
 import { bridge } from './bridge';
 import { exportHTML } from './export';
@@ -95,7 +95,7 @@ export function DingTalkPanel({ path }: { path: string }) {
           if (s.error) setError(s.error);
         }
       })
-      .catch((e) => active && setError(e.message));
+      .catch((e) => active && setError(errorMessage(e)));
     return () => {
       active = false;
     };
@@ -120,7 +120,7 @@ export function DingTalkPanel({ path }: { path: string }) {
         if (active) setPlan(p);
       })
       .catch((e) => {
-        if (active) setError(e.message);
+        if (active) setError(errorMessage(e));
       })
       .finally(() => {
         if (active) setBusy(false);
@@ -164,7 +164,7 @@ export function DingTalkPanel({ path }: { path: string }) {
       setMessage(result.unchanged ? t('钉钉文档已是最新。') : t('已发布为钉钉在线文档。'));
       setPlan((p: any) => ({ ...p, action: 'current', requiresReview: false }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
       await refreshStatus().catch(() => {});
     } finally {
       setBusy(false);
@@ -179,7 +179,7 @@ export function DingTalkPanel({ path }: { path: string }) {
       setMessage(t('已确认上次发布内容。'));
       setReload((n) => n + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -197,7 +197,7 @@ export function DingTalkPanel({ path }: { path: string }) {
         ),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -227,7 +227,7 @@ export function DingTalkPanel({ path }: { path: string }) {
       );
       setReload((n) => n + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -243,7 +243,7 @@ export function DingTalkPanel({ path }: { path: string }) {
           : t('已向 {0} 位同事发送链接。', { '0': result.sent }),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setShare(await bridge.dingtalkShareStatus(path, recipient).catch(() => null));
       setBusy(false);
@@ -265,7 +265,7 @@ export function DingTalkPanel({ path }: { path: string }) {
         outcome === 'sent' ? t('已记录送达结果。') : t('已记录为全部未送达，可以重新确认。'),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }

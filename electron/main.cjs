@@ -23,6 +23,8 @@ const { DocumentCatalog } = require('../core/document-catalog.cjs');
 const { embedLocalImages } = require('../core/export-assets.cjs');
 const { exportDocx } = require('../core/docx.cjs');
 const { Workspaces } = require('../core/workspaces.cjs');
+const { OperationGroup } = require('../core/operation-group.cjs');
+const documentOperations = new OperationGroup();
 const { DocumentLibrary } = require('../core/library.cjs');
 const { createProjectServices } = require('./projects.cjs');
 let projects,
@@ -148,22 +150,28 @@ function refreshObservedDocument({ root, path: p }) {
   clearTimeout(documentTimers.get(p));
   documentTimers.set(
     p,
-    setTimeout(async () => {
-      documentTimers.delete(p);
-      if (!workspaceSession.documents.has(p)) return;
-      try {
-        const { store, knowledge } = workspaces.current(root);
-        const file = { ...(await store.read(p)), workspaceRoot: root };
-        await observeDocument(knowledge, file);
-        if (workspaceSession.documents.has(p)) send('file-changed', { path: p, file });
-      } catch (e) {
-        if (workspaceSession.documents.has(p))
-          send(
-            'file-changed',
-            e.code === 'ENOENT' ? { path: p, deleted: true } : { path: p, error: e.message },
-          );
-      }
-    }, 180),
+    setTimeout(
+      () =>
+        void documentOperations
+          .run(async () => {
+            documentTimers.delete(p);
+            if (!workspaceSession.documents.has(p)) return;
+            try {
+              const { store, knowledge } = workspaces.current(root);
+              const file = { ...(await store.read(p)), workspaceRoot: root };
+              await observeDocument(knowledge, file);
+              if (workspaceSession.documents.has(p)) send('file-changed', { path: p, file });
+            } catch (e) {
+              if (workspaceSession.documents.has(p))
+                send(
+                  'file-changed',
+                  e.code === 'ENOENT' ? { path: p, deleted: true } : { path: p, error: e.message },
+                );
+            }
+          })
+          .catch(() => {}),
+      180,
+    ),
   );
 }
 async function observeDocument(knowledge, file) {
@@ -215,7 +223,7 @@ function handle(name, fn) {
       );
     const finish = updateGate.enter(name);
     try {
-      return await fn(...args);
+      return await documentOperations.run(() => fn(...args));
     } catch (error) {
       diagnostics?.record('ipc-failure', { operation: name, code: error.code });
       throw Object.assign(new Error(translateUI(error.message || String(error))), {
@@ -235,7 +243,16 @@ async function init() {
   handle('clipboard-write', require('./clipboard.cjs').createClipboardWriter(clipboard));
   handle(
     'clipboard-write-content',
-    require('./clipboard.cjs').createRichClipboardWriter(clipboard),
+    require('./clipboard.cjs').createRichClipboardWriter(
+      clipboard,
+      (content, documentPath, signal) =>
+        require('../core/clipboard-assets.cjs').embedClipboardAssets(
+          content,
+          documentPath,
+          workspaces,
+          signal,
+        ),
+    ),
   );
   handle('diagnostics-snapshot', () => diagnostics.snapshot());
   handle('diagnostics-export', async () => {
@@ -339,7 +356,10 @@ async function init() {
     try {
       const url = new URL(request.url),
         target = url.searchParams.get('path');
-      const { store } = await workspaces.forPath(target);
+      if (url.hostname !== 'local') return new Response('Not found', { status: 404 });
+      const { store } = await workspaces.forPath(url.searchParams.get('document'), {
+        missing: true,
+      });
       const file = await store.safe(target);
       if (!/\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(file))
         return new Response('Unsupported asset', { status: 415 });
@@ -671,20 +691,13 @@ async function init() {
       throw Error('请输入有效的 Markdown 文件名。');
     const dest = await store.safe(path.join(path.dirname(p), name), true);
     if (p === dest) return store.read(p);
-    // Under the same lock as save: otherwise a rename can capture the old inode
-    // while a save is mid-replace, and the saved bytes go to the unlinked file.
-    return store.exclusive(p, async (source) => {
-      // link is an atomic, no-clobber destination creation on the same volume.
-      await fs.link(source, dest);
-      try {
-        await fs.unlink(source);
-      } catch (e) {
-        await fs.unlink(dest);
-        throw e;
-      }
-      await knowledge.rename(source, dest);
-      return store.read(dest);
-    });
+    const renamed = await store.rename(p, dest);
+    await knowledge
+      .rename(p, dest)
+      .catch((error) =>
+        send('notice', translateUI('文档仍可阅读；来源记录暂不可用：') + error.message),
+      );
+    return renamed;
   });
   handle('trash', async (p) => {
     const { store } = await workspaces.forPath(p);
@@ -1094,6 +1107,7 @@ app.on('window-all-closed', () => app.quit());
 require('./shutdown.cjs').installShutdown(
   app,
   async () => {
+    const requests = documentOperations.close();
     for (const timer of treeTimers.values()) clearTimeout(timer);
     for (const timer of documentTimers.values()) clearTimeout(timer);
     // Readers cancel independently; document replacements finish or roll back
@@ -1105,6 +1119,8 @@ require('./shutdown.cjs').installShutdown(
       projects?.close(),
       agent?.close(),
     ]);
+    await requests;
+    await workspaces?.close();
     await diagnostics?.writing;
   },
   (error) => {

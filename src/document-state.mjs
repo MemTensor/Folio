@@ -4,6 +4,22 @@
 /** @param {DocumentState} doc */
 export const isChanged = (doc) => doc.content !== doc.file.content;
 
+/** Acknowledging our own write must not discard a newer external revision.
+ * @param {DocumentState} doc @param {FileSnapshot} file @param {number} revision @param {boolean} recreate
+ */
+export function acknowledgeSave(doc, file, revision, recreate = false) {
+  return {
+    ...doc,
+    file,
+    saving: false,
+    pending:
+      doc.pending?.hash === file.hash || (recreate && doc.pending === null)
+        ? undefined
+        : doc.pending,
+    restorePending: doc.revision === revision ? false : doc.restorePending,
+  };
+}
+
 /** @param {DocumentState} doc */
 export function documentDraft(doc) {
   return isChanged(doc) || doc.pending !== undefined || doc.restorePending

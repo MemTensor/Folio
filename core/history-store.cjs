@@ -235,6 +235,27 @@ class HistoryStore {
         .map(({ sequence, ...entry }) => entry);
     });
   }
+  async copyTo(before, after) {
+    return withLock(this.dataDir, 'history-catalog', async () => {
+      const db = await this.loadCatalog();
+      await this.inspectOrphans(db, before);
+      await this.inspectOrphans(db, after);
+      const source = db.documents[digest(before)],
+        target = db.documents[digest(after)];
+      for (const meta of source.entries) {
+        if (target.entries.some((entry) => entry.hash === meta.hash)) continue;
+        const record = await readJSON(this.file(before, meta.hash));
+        if (!validRecord(record) || record.path !== before || record.hash !== meta.hash) continue;
+        const copied = { ...record, path: after };
+        const file = this.file(after, meta.hash);
+        await writeJSON(file, copied);
+        target.entries.push(this.metadata(copied, (await fs.stat(file)).size, ++db.sequence));
+      }
+      target.latestObservedHash = source.latestObservedHash;
+      // Retain the old copies too: an interrupted rename cannot orphan recovery.
+      await this.prune(db);
+    });
+  }
   async entry(target, hash) {
     const file = this.file(target, hash);
     let record;

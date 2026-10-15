@@ -5,6 +5,7 @@ const MarkdownIt = require('markdown-it');
 const { diffLines } = require('diff');
 const { digest, readRecoverableJSON, writeRecoverableJSON, withLock } = require('./state.cjs');
 const parser = new MarkdownIt({ html: true });
+const unchanged = Symbol('unchanged');
 const object = (value) => value && typeof value === 'object' && !Array.isArray(value);
 const validKnowledge = (db) =>
   object(db) &&
@@ -17,6 +18,18 @@ const validKnowledge = (db) =>
       typeof doc.path === 'string' &&
       Array.isArray(doc.events),
   );
+function changeSummary(before, after) {
+  if (before === undefined) return { changes: null };
+  const parts = diffLines(before, after, { timeout: 40, maxEditLength: 1024 });
+  if (!parts) return { changes: null, changesUnavailable: 'diff-budget' };
+  let addedLines = 0,
+    removedLines = 0;
+  for (const part of parts) {
+    if (part.added) addedLines += part.count;
+    if (part.removed) removedLines += part.count;
+  }
+  return { changes: { addedLines, removedLines } };
+}
 function attribution(value = {}) {
   const actor = String(value.actor || 'external-unknown').slice(0, 100),
     origin = value.origin || 'unknown';
@@ -77,17 +90,29 @@ class KnowledgeStore {
     return withLock(this.dataDir, 'knowledge:' + file, async () => {
       const db = await this.state();
       const result = await fn(db);
+      const migration =
+        db.schemaVersion !== 2 ||
+        Object.values(db.documents).some((doc) => Object.hasOwn(doc, 'lastContent'));
+      if (migration) {
+        for (const doc of Object.values(db.documents)) delete doc.lastContent;
+        db.schemaVersion = 2;
+      }
+      if (result?.[unchanged] && !migration) return result.value;
       await writeRecoverableJSON(file, db, {
         validate: validKnowledge,
         label: '项目文档身份与发布记录',
       });
-      return result;
+      return result?.[unchanged] ? result.value : result;
     });
   }
-  async observe(snapshot, declared) {
+  async observe(snapshot, declared, previous) {
     const p = snapshot.path;
-    return this.mutate((db) => {
+    return this.mutate(async (db) => {
       let doc = db.documents[p];
+      if (doc && doc.revision === snapshot.hash && !declared && doc.mtime === snapshot.mtime) {
+        const { lastContent, ...visible } = doc;
+        return { [unchanged]: true, value: visible };
+      }
       if (!doc)
         doc = db.documents[p] = {
           id: crypto.randomUUID(),
@@ -95,44 +120,49 @@ class KnowledgeStore {
           events: [],
           createdAt: Date.now(),
         };
-      const same = doc.events.find((e) => e.revision === snapshot.hash),
-        author = attribution(declared);
-      if (!same || declared) {
-        let adds = 0,
-          removes = 0;
-        const old = doc.lastContent;
-        const parts =
-          old === undefined
-            ? null
-            : diffLines(old, snapshot.content, { timeout: 40, maxEditLength: 1024 });
-        if (parts)
-          for (const d of parts) {
-            if (d.added) adds += d.count;
-            if (d.removed) removes += d.count;
-          }
-        const event = {
+      const same =
+        doc.revision === snapshot.hash
+          ? doc.events.findLast((e) => e.revision === snapshot.hash)
+          : null;
+      const author = attribution(declared);
+      if (same && same.evidence === 'unattributed' && declared) {
+        // A watcher can observe a CLI write first. Enrich its attribution without
+        // recomputing the delta against the revision it just observed.
+        if (previous && previous.hash !== same.baseRevision) {
+          delete same.changesUnavailable;
+          Object.assign(same, changeSummary(previous.content, snapshot.content));
+        }
+        Object.assign(same, author, { baseRevision: declared.baseRevision ?? same.baseRevision });
+      } else if (
+        !same ||
+        (declared && Object.entries(author).some(([key, value]) => same[key] !== value))
+      ) {
+        const history = doc.revision
+          ? await this.store.recovery.entry(p, doc.revision).catch(() => null)
+          : null;
+        const old = previous?.content ?? doc.lastContent ?? history?.content;
+        doc.events.push({
           id: crypto.randomUUID(),
           revision: snapshot.hash,
-          baseRevision: declared?.baseRevision || doc.revision || null,
+          baseRevision: declared?.baseRevision ?? doc.revision ?? null,
           observedAt: Date.now(),
           ...author,
-          changes: parts ? { addedLines: adds, removedLines: removes } : null,
-          ...(old !== undefined && !parts ? { changesUnavailable: 'diff-budget' } : {}),
-        };
-        if (same && same.evidence === 'unattributed' && declared)
-          doc.events.splice(doc.events.indexOf(same), 1, event);
-        else if (!same || declared) doc.events.push(event);
+          ...changeSummary(old, snapshot.content),
+          ...(doc.revision && old === undefined
+            ? { changesUnavailable: 'history-unavailable' }
+            : {}),
+        });
         doc.events = doc.events.slice(-200);
       }
       if (!doc.mtime || !snapshot.mtime || snapshot.mtime >= doc.mtime) {
         doc.revision = snapshot.hash;
         doc.mtime = snapshot.mtime;
-        doc.lastContent = snapshot.content;
       }
-      const { lastContent, ...visible } = doc;
-      return visible;
+      delete doc.lastContent;
+      return { ...doc };
     });
   }
+
   async inspect(p) {
     const snapshot = await this.store.read(p);
     return {
@@ -143,7 +173,11 @@ class KnowledgeStore {
   }
   async recordWrite(previous, result, author) {
     if (result.ok)
-      await this.observe(result.file, { ...author, baseRevision: previous?.hash || null });
+      await this.observe(
+        result.file,
+        { ...author, baseRevision: previous?.hash || null },
+        previous,
+      );
     return result;
   }
   async provenance(p) {

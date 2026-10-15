@@ -20,6 +20,10 @@ const path = require('node:path');
   const temporary = await fs.realpath(
     await fs.mkdtemp(path.join(os.tmpdir(), 'folio-package-folders-')),
   );
+  const { DocumentLibrary } = require(
+    path.join(bundle, 'Contents/Resources/app.asar/core/library.cjs'),
+  );
+  const library = new DocumentLibrary(path.join(temporary, 'library-state'));
   let session, change;
   const browser = new WorkspaceBrowser({ onChange: (event) => session.changed(event) });
   const catalog = new DocumentCatalog(path.join(temporary, 'catalog-state'));
@@ -124,8 +128,16 @@ const path = require('node:path');
     assert.equal(incremental.documents[0].size, Buffer.byteLength(editedContent));
     assert.equal((await browser.debugStats()).files, 0);
     assert.equal((await browser.debugStats()).directories, 1);
+    const indexed = path.join(catalogRoot, 'Index.md');
+    await fs.writeFile(indexed, '# Generated index fixture\npackaged-index-keyword');
+    await library.register(catalogRoot);
+    const found = await library.snapshot({ query: 'packaged-index-keyword' });
+    assert.equal(found.total, 1);
+    assert.equal(found.documents[0].match.line, 2);
+    assert.equal((await library.snapshot({ query: 'packaged-index-keyword' })).index.filesRead, 0);
     console.log(
       JSON.stringify({
+        packagedSQLite: true,
         ok: true,
         packagedWorker: true,
         directoryWatchers: stats.directories,
@@ -145,6 +157,7 @@ const path = require('node:path');
       }),
     );
   } finally {
+    await library.close();
     await catalog.close();
     await session.close();
     await fs.rm(temporary, { recursive: true, force: true });

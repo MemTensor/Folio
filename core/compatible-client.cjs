@@ -165,6 +165,7 @@ class CompatibleClient extends EventEmitter {
       return {};
     }
     if (method === 'thread/unsubscribe') {
+      this.controllers.get(params.threadId)?.abort();
       this.threads.delete(params.threadId);
       return { status: 'unsubscribed' };
     }
@@ -212,7 +213,6 @@ class CompatibleClient extends EventEmitter {
       const thread = this.threads.get(threadId);
       const model = thread?.model || this.config.model;
       const messages = [
-        ...(thread?.messages || []),
         {
           role: 'system',
           content:
@@ -220,6 +220,7 @@ class CompatibleClient extends EventEmitter {
             '\nReturn only JSON matching this schema: ' +
             JSON.stringify(params.outputSchema),
         },
+        ...(thread?.messages || []).filter((message) => message.role !== 'system'),
         { role: 'user', content: params.input.map((item) => item.text).join('\n') },
       ];
       const tools =

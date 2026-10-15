@@ -2,9 +2,10 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { isDependencyDirectory } = require('./ignored-directories.cjs');
 const crypto = require('node:crypto');
-const { encodeText } = require('./encoding.cjs');
+const { encodeText, preferredEOL } = require('./encoding.cjs');
 const { withLock, readRecoverableJSON, writeRecoverableJSON } = require('./state.cjs');
 const { HistoryStore } = require('./history-store.cjs');
+const { OperationGroup } = require('./operation-group.cjs');
 const MAX_BYTES = 16 * 1024 * 1024;
 const hash = (text) => crypto.createHash('sha256').update(text).digest('hex');
 const markdown = (name) => /\.(md|markdown|mdown|mkd|txt|mdx|qmd|rmd)$/i.test(name);
@@ -18,6 +19,7 @@ class FileStore {
     this.dataDir = dataDir;
     this.root = null;
     this.queues = new Map();
+    this.operations = new OperationGroup();
     this.recovery = new HistoryStore(dataDir, {
       maxBytes: historyMaxBytes,
       maxEntries: historyMaxEntries,
@@ -54,7 +56,7 @@ class FileStore {
       path: target,
       content: (bom ? raw.slice(1) : raw).replace(/\r\n/g, '\n'),
       hash: hash(bytes),
-      eol: raw.includes('\r\n') ? 'CRLF' : 'LF',
+      eol: preferredEOL(raw),
       bom,
       mtime: stat.mtimeMs,
       size: bytes.length,
@@ -75,6 +77,9 @@ class FileStore {
     return { ...visible, ...(historyBudget.overBudget ? { historyBudget } : {}) };
   }
   async checkpoint(target, content, reason = 'human-before-review') {
+    return this.operations.run(() => this.checkpointQueued(target, content, reason));
+  }
+  async checkpointQueued(target, content, reason) {
     const p = await this.safe(target, true);
     if (typeof content !== 'string' || Buffer.byteLength(content) > MAX_BYTES)
       throw Error('快照内容无效。');
@@ -111,6 +116,9 @@ class FileStore {
    * @param {string} target @param {(resolved: string) => Promise<any>} run
    */
   async exclusive(target, run) {
+    return this.operations.run(() => this.exclusiveQueued(target, run));
+  }
+  async exclusiveQueued(target, run) {
     const p = await this.safe(target, true);
     const prior = this.queues.get(p) || Promise.resolve();
     const job = prior.catch(() => {}).then(() => withLock(this.dataDir, 'file:' + p, () => run(p)));
@@ -122,6 +130,57 @@ class FileStore {
     }
   }
   async save(args) {
+    return this.operations.run(() => this.saveQueued(args));
+  }
+  async rename(target, destination) {
+    return this.operations.run(async () => {
+      const before = await this.safe(target),
+        after = await this.safe(destination, true);
+      if (before === after) return this.read(before);
+      if (!markdown(before) || !markdown(after)) throw Error('只能重命名 Markdown 或文本文件。');
+      const keys = [before, after].sort();
+      return withLock(this.dataDir, 'file:' + keys[0], () =>
+        withLock(this.dataDir, 'file:' + keys[1], async () => {
+          const linked = await this.snapshot(before),
+            identity = await fs.stat(before);
+          await fs.link(before, after);
+          try {
+            await this.recovery.copyTo(before, after);
+            const draft = await this.readDraft(before);
+            if (draft) {
+              const existing = await this.readDraft(after);
+              if (existing)
+                await this.checkpointQueued(after, existing.content, 'recovery-before-rename');
+              await this.writeDraftLocked(after, {
+                ...draft,
+                ...(draft.base ? { base: { ...draft.base, path: after } } : {}),
+              });
+            }
+            const current = await fs.stat(before);
+            if (
+              current.ino !== identity.ino ||
+              current.dev !== identity.dev ||
+              (await this.snapshot(before)).hash !== linked.hash
+            )
+              throw Error('文档已变化，本次操作尚未应用，请重新审阅。');
+            await fs.unlink(before);
+          } catch (error) {
+            // Do not remove a destination replaced or edited by another program.
+            const current = await fs.stat(after).catch(() => null);
+            if (
+              current?.ino === identity.ino &&
+              current?.dev === identity.dev &&
+              (await this.snapshot(after).catch(() => null))?.hash === linked.hash
+            )
+              await fs.unlink(after).catch(() => {});
+            throw error;
+          }
+          return this.read(after);
+        }),
+      );
+    });
+  }
+  async saveQueued(args) {
     const p = await this.safe(args.path, true);
     if (!markdown(p)) throw Error('只允许写入 Markdown 或文本文件。');
     if (
@@ -262,6 +321,9 @@ class FileStore {
     return results;
   }
   async writeDraft(target, draft) {
+    return this.operations.run(() => this.writeDraftQueued(target, draft));
+  }
+  async writeDraftQueued(target, draft) {
     if (!this.root || typeof target !== 'string') throw Error('草稿路径无效。');
     // Enqueue before asynchronous realpath checks so invocation order is preserved.
     const key = 'draft:' + path.resolve(this.root, target);
@@ -303,6 +365,9 @@ class FileStore {
         typeof d.content === 'string' &&
         Buffer.byteLength(d.content) <= MAX_BYTES,
     });
+  }
+  async close() {
+    await this.operations.close();
   }
 }
 module.exports = { FileStore, hash, within, markdown, MAX_BYTES };

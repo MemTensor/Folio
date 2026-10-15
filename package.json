@@ -1,7 +1,7 @@
 {
   "name": "folio-markdown",
   "productName": "Folio",
-  "version": "0.5.0-beta.20",
+  "version": "0.5.0-beta.21",
   "private": true,
   "license": "UNLICENSED",
   "repository": {
@@ -18,7 +18,7 @@
     "start": "electron .",
     "build": "tsc -b && vite build && node scripts/build-cli.mjs && node scripts/build-updater.mjs && node scripts/collect-licenses.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "npm run format:check && npm run test && npm run build && node scripts/verify-cli.mjs && node scripts/verify-desktop.mjs --scenario all --language en && node scripts/verify-heading.mjs && node scripts/verify-updater.mjs && node scripts/verify-shutdown.mjs",
+    "check": "npm run format:check && npm run test && npm run build && node scripts/verify-cli.mjs && node scripts/verify-desktop.mjs --scenario all --language en && node scripts/verify-heading.mjs && node scripts/verify-editor-regressions.mjs && node scripts/verify-updater.mjs && node scripts/verify-shutdown.mjs",
     "pack": "npm run build && electron-builder --mac dir && node scripts/verify-package.mjs",
     "verify:package": "node scripts/verify-package.mjs",
     "dist": "npm run build && electron-builder --mac zip && node scripts/verify-package.mjs",
@@ -85,7 +85,7 @@
     "appId": "io.folio.markdown",
     "productName": "Folio",
     "directories": {
-      "output": "release/v0.5.0-beta.20"
+      "output": "release/v${version}"
     },
     "files": [
       "dist/**/*",

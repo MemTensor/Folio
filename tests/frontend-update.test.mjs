@@ -228,11 +228,13 @@ test('actual editor commands respect the synchronous CodeMirror read-only state'
   const context = {
     exports: {},
     require: (id) =>
-      id === './markdown' || id === './task-markers.mjs' || id === './reading-copy'
-        ? {}
-        : id === './i18n'
-          ? { t: (message) => message, getLocale: () => 'zh-CN', subscribeLocale: () => () => {} }
-          : require(id),
+      id === './editor-changes.mjs'
+        ? require('../src/editor-changes.mjs')
+        : id === './markdown' || id === './task-markers.mjs' || id === './reading-copy'
+          ? {}
+          : id === './i18n'
+            ? { t: (message) => message, getLocale: () => 'zh-CN', subscribeLocale: () => () => {} }
+            : require(id),
   };
   vm.runInNewContext(output, context);
   const view = {

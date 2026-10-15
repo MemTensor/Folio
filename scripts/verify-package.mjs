@@ -1,3 +1,4 @@
+import buildPaths from '../core/build-output.cjs';
 // Runs the packaged application's own code from inside app.asar. `npm run check`
 // exercises the source tree; this is the only check that proves the bundle that
 // ships actually loads its workers and resolves its resources.
@@ -8,9 +9,10 @@ import process from 'node:process';
 import repository from '../core/repository.cjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const { version } = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+const { version } = pkg;
 const bundle =
-  process.argv[2] || path.join(root, 'release', 'v' + version, 'mac-arm64', 'Folio.app');
+  process.argv[2] || path.join(buildPaths.buildOutput(root, pkg), 'mac-arm64', 'Folio.app');
 const electron = path.join(bundle, 'Contents/MacOS/Folio');
 
 function run(args, { cwd = root } = {}) {

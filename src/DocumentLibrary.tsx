@@ -1,4 +1,4 @@
-import { t, localeTag } from './i18n';
+import { t, localeTag, errorMessage } from './i18n';
 import { useEffect, useState } from 'react';
 import { FileText, FolderOpen, MagnifyingGlass, ArrowUpRight } from '@phosphor-icons/react';
 import { bridge } from './bridge';
@@ -64,7 +64,7 @@ export function DocumentLibrary({
             }
           })
           .catch((e) => {
-            if (active) setError(e.message);
+            if (active) setError(errorMessage(e));
           })
           .finally(() => {
             if (active) setBusy(false);
@@ -92,7 +92,7 @@ export function DocumentLibrary({
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setOpening(false);
     }

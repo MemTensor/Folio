@@ -90,7 +90,13 @@ function markdownNode(node: Node, complete: Map<string, string>): string {
   }
   if (tag === 'a') return '[' + inner() + '](' + (el.getAttribute('href') || '') + ')';
   if (tag === 'img')
-    return '![' + (el.getAttribute('alt') || '') + '](' + (el.getAttribute('src') || '') + ')';
+    return (
+      '![' +
+      (el.getAttribute('alt') || '') +
+      '](' +
+      (el.dataset.folioImageSource || el.getAttribute('src') || '') +
+      ')'
+    );
   if (tag === 'br') return '\n';
   if (tag === 'hr') return '\n\n---\n\n';
   if (tag && /^h[1-6]$/.test(tag))
@@ -140,6 +146,7 @@ export interface CopySelection {
   text: string;
   html: string;
   markdown: string;
+  sourceRange?: { from: number; to: number } | null;
 }
 export function copySelection(
   root: HTMLElement,
@@ -179,9 +186,32 @@ export function copySelection(
     .filter((value): value is NonNullable<typeof value> => value !== null);
   const fragment = selectedFragment(range, root);
   let markdown = markdownNode(fragment, complete).replace(/^\n+|\n+$/g, '');
-  if (fullySelected(range, root)) markdown = content;
-  else if (spans.length && spans.every((span) => span.full))
+  let sourceRange: CopySelection['sourceRange'] = null;
+  if (fullySelected(range, root)) {
+    markdown = content;
+    sourceRange = { from: 0, to: content.length };
+  } else if (spans.length && spans.every((span) => span.full)) {
     markdown = content.slice(spans[0].from, spans.at(-1)!.to);
+    sourceRange = { from: spans[0].from, to: spans.at(-1)!.to };
+  }
+  if (!sourceRange && spans.length) {
+    const start = spans[0].from,
+      raw = content.slice(start, spans.at(-1)!.to);
+    // Match only inside the selected source blocks. Repeated text in another
+    // paragraph must not redirect the Agent's context to that other paragraph.
+    for (const candidate of [
+      markdown,
+      markdown.replace(/\*\*([^*]+)\*\*/g, '__$1__'),
+      selection.toString(),
+    ]) {
+      if (!candidate) continue;
+      const at = raw.indexOf(candidate);
+      if (at >= 0 && raw.indexOf(candidate, at + 1) < 0) {
+        sourceRange = { from: start + at, to: start + at + candidate.length };
+        break;
+      }
+    }
+  }
   const holder = root.ownerDocument.createElement('div');
   holder.append(fragment);
   holder.querySelectorAll('*').forEach((node) => {
@@ -194,6 +224,7 @@ export function copySelection(
         node.removeAttribute(attribute.name);
   });
   const html = DOMPurify.sanitize(holder.innerHTML, {
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|folio-asset):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     FORBID_TAGS: [
       'script',
       'iframe',
@@ -217,7 +248,7 @@ export function copySelection(
     .querySelectorAll('td,th')
     .forEach((node) => node.setAttribute('style', 'border:1px solid #cccccc;padding:6px 10px'));
   const text = selection.toString() || markdown;
-  return { text, html: rich.innerHTML, markdown };
+  return { text, html: rich.innerHTML, markdown, sourceRange };
 }
 export function clipboardPayload(selected: CopySelection, format: 'source' | 'rich') {
   const content =

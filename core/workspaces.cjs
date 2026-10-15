@@ -10,13 +10,18 @@ class Workspaces {
     this.dataDir = dataDir;
     this.entries = new Map();
     this.activeRoot = null;
+    this.closed = false;
+    this.stores = new Set();
   }
   async admit(root) {
     root = await fs.realpath(root);
+    if (this.closed) throw Error('后台任务仍在收尾，完成后会退出。');
     let entry = this.entries.get(root);
     if (!entry) {
       const store = new FileStore(this.dataDir);
       await store.setRoot(root);
+      if (this.closed) throw Error('后台任务仍在收尾，完成后会退出。');
+      this.stores.add(store);
       entry = { store, knowledge: new KnowledgeStore(store) };
       this.entries.set(root, entry);
     }
@@ -49,6 +54,10 @@ class Workspaces {
     const entry = this.entries.get(root);
     await entry.store.safe(target, missing);
     return entry;
+  }
+  async close() {
+    this.closed = true;
+    await Promise.allSettled([...this.stores].map((store) => store.close()));
   }
 }
 module.exports = { Workspaces };

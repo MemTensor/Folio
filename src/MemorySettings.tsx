@@ -1,4 +1,4 @@
-import { t } from './i18n';
+import { t, errorMessage } from './i18n';
 import { useEffect, useRef, useState } from 'react';
 import { bridge } from './bridge';
 
@@ -29,7 +29,7 @@ export function MemorySettings({ workspace }: { workspace: string }) {
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }

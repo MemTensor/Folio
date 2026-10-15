@@ -20,6 +20,7 @@ export interface RenderEnv {
   copySource?: string;
   headings?: Heading[];
   lineOffset?: number;
+  blockOffset?: number;
 }
 export interface Heading {
   level: number;
@@ -212,20 +213,11 @@ parser.renderer.rules.toc = (tokens, i, _opts, env: RenderEnv) =>
         `<a class="toc-level-${Math.min(6, Math.max(1, h.level))}" href="#${h.id}">${escapeHTML(h.text)}</a>`,
     )
     .join('')}</nav>`;
-parser.renderer.rules.image = (tokens, i, _options, env: RenderEnv) => {
+parser.renderer.rules.image = (tokens, i, _options, env) => {
   const token = tokens[i],
-    src = token.attrGet('src') || '',
-    url = imageURL(src, env),
-    alt = token.content;
-  if (url) return `<img src="${escapeHTML(url)}" alt="${escapeHTML(alt)}" loading="lazy" />`;
-  const markers = (env as RenderEnv & { imageMarkers?: Map<string, { src: string; alt: string }> })
-    .imageMarkers;
-  if (/^https?:/i.test(src) && env.imageControls && markers) {
-    const id = crypto.randomUUID();
-    markers.set(id, { src, alt });
-    return `<span data-folio-remote-image="${id}"></span>`;
-  }
-  return `<span class="image-unloaded">${escapeHTML(t('图片：'))}${escapeHTML(alt || src)}${/^https?:/i.test(src) ? t(' · 网络图片未启用') : ''}</span>`;
+    id = crypto.randomUUID();
+  env.imageMarkers.set(id, { src: token.attrGet('src') || '', alt: token.content });
+  return `<img data-folio-render-image="${id}" alt="${escapeHTML(token.content)}" loading="lazy" />`;
 };
 for (const rule of ['fence', 'code_block']) {
   const render = parser.renderer.rules[rule]!;
@@ -233,8 +225,10 @@ for (const rule of ['fence', 'code_block']) {
     render(tokens, i, options, env, self).replace(/^<pre\b/, '<pre' + copyMarker(tokens[i]));
 }
 export function headings(content: string): Heading[] {
-  const tokens = parser.parse(content, {}),
-    seen = new Map<string, number>();
+  return headingsForTokens(parser.parse(content, {}));
+}
+export function headingsForTokens(tokens: any[]): Heading[] {
+  const seen = new Map<string, number>();
   return tokens.flatMap((token, i) => {
     if (token.type !== 'heading_open' || !token.map) return [];
     const text = tokens[i + 1].content,
@@ -258,7 +252,11 @@ export function headings(content: string): Heading[] {
 export function renderMarkdown(content: string, env: RenderEnv = {}) {
   const context: any = {};
   const tokens = parser.parse(content, context);
-  return renderTokens(tokens, { ...context, ...env, headings: env.headings || headings(content) });
+  return renderTokens(tokens, {
+    ...context,
+    ...env,
+    headings: env.headings || headingsForTokens(tokens),
+  });
 }
 export function renderTokens(tokens: any[], env: RenderEnv = {}) {
   const hs = env.headings || [];
@@ -318,7 +316,7 @@ export function renderTokens(tokens: any[], env: RenderEnv = {}) {
     ],
     FORBID_ATTR: ['srcdoc', 'srcset', 'style'],
     ALLOW_DATA_ATTR: true,
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|folio-asset):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   }).replace(
     /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/g,
     (_m, t) =>
@@ -365,11 +363,9 @@ export function renderTokens(tokens: any[], env: RenderEnv = {}) {
     }
     return placeholder;
   };
-  fragment.content.querySelectorAll<HTMLElement>('[data-folio-remote-image]').forEach((node) => {
-    const image = imageMarkers.get(node.dataset.folioRemoteImage || '');
-    if (image) node.replaceWith(imagePlaceholder(image.src, image.alt));
-    else node.removeAttribute('data-folio-remote-image');
-  });
+  fragment.content
+    .querySelectorAll('[data-folio-image-source]')
+    .forEach((node) => node.removeAttribute('data-folio-image-source'));
   fragment.content.querySelectorAll<HTMLElement>('[data-folio-task]').forEach((node) => {
     const marker = taskMarkers.get(node.dataset.folioTask || '');
     if (!marker) {
@@ -381,16 +377,18 @@ export function renderTokens(tokens: any[], env: RenderEnv = {}) {
     checkbox.className = 'task-list-item-checkbox';
     checkbox.setAttribute('aria-label', t('任务状态'));
     if (marker.checked) checkbox.setAttribute('checked', '');
-    checkbox.dataset.taskOffset = String(marker.offset);
+    checkbox.dataset.taskOffset = String(marker.offset - (env.blockOffset || 0));
     node.replaceWith(checkbox);
   });
   fragment.content.querySelectorAll('img').forEach((img) => {
-    const source = img.getAttribute('src') || '',
-      url = source.startsWith('folio-asset:') ? source : imageURL(source, env);
-    if (url) img.setAttribute('src', url);
-    else {
-      img.replaceWith(imagePlaceholder(source, img.alt));
-    }
+    const generated = imageMarkers.get(img.dataset.folioRenderImage || '');
+    img.removeAttribute('data-folio-render-image');
+    const source = generated?.src ?? img.getAttribute('src') ?? '';
+    const url = source ? imageURL(source, env) : '';
+    if (url) {
+      img.setAttribute('src', url);
+      img.dataset.folioImageSource = source;
+    } else img.replaceWith(imagePlaceholder(source, generated?.alt ?? img.alt));
   });
   return fragment.innerHTML;
 }

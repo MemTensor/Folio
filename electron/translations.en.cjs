@@ -1,4 +1,7 @@
 module.exports = {
+  '图片复制超时，请稍后重试。': 'Copying images timed out. Try again shortly.',
+  '文档已变化，本次操作尚未应用，请重新审阅。':
+    'The document changed, so this action was not applied. Review it again.',
   复制带格式文本: 'Copy rich text',
   '复制 Markdown 源码': 'Copy Markdown source',
   返回设置: 'Back to settings',

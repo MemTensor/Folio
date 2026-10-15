@@ -80,3 +80,15 @@ export function applyAgentEdits(content, edits) {
   }
   return next;
 }
+
+/** @param {Array<{from:number,to:number,before:string,after:string}>} edits */
+export function inverseAgentChanges(edits) {
+  let offset = 0;
+  return [...edits]
+    .sort((a, b) => a.from - b.from)
+    .map((edit) => {
+      const from = edit.from + offset;
+      offset += edit.after.length - (edit.to - edit.from);
+      return { from, to: from + edit.after.length, insert: edit.before };
+    });
+}

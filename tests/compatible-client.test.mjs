@@ -516,3 +516,37 @@ test('API visual tool output uses image input instead of stuffing base64 into to
   assert.equal(requests[1].messages.at(-1).content[1].image_url.url, image);
   await client.close();
 });
+
+test('repair turns retain conversation with exactly one leading system message', async () => {
+  const requests = [];
+  const client = new CompatibleClient(
+    { credentials: async () => ({ baseURL: 'https://fixture.invalid/v1', model: 'fixture' }) },
+    {
+      fetchImpl: async (_url, request) => {
+        requests.push(JSON.parse(request.body));
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '{"answer":"fixture","edits":[]}' } }],
+          }),
+          { headers: { 'Content-Type': 'application/json' } },
+        );
+      },
+    },
+  );
+  await client.start();
+  const { thread } = await client.request('thread/start', {
+    baseInstructions: 'Generated fixture',
+  });
+  const request = {
+    threadId: thread.id,
+    input: [{ text: 'request' }],
+    outputSchema: { type: 'object' },
+  };
+  await client.run(request, 'one');
+  await client.run(request, 'repair');
+  await client.close();
+  assert.deepEqual(
+    requests[1].messages.map((message) => message.role),
+    ['system', 'user', 'assistant', 'user'],
+  );
+});

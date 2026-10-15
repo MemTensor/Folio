@@ -16,13 +16,16 @@ function ensureIndex() {
  CREATE TABLE IF NOT EXISTS documents (
   path TEXT PRIMARY KEY, root TEXT NOT NULL, name TEXT NOT NULL, relativePath TEXT NOT NULL,
   modifiedAt REAL NOT NULL, changedAt REAL NOT NULL, bytes INTEGER NOT NULL, inode TEXT NOT NULL,
-  content TEXT NOT NULL, folded TEXT NOT NULL);
+  content TEXT NOT NULL, folded TEXT NOT NULL DEFAULT '');
  CREATE INDEX IF NOT EXISTS documents_root ON documents(root);
  CREATE VIRTUAL TABLE IF NOT EXISTS document_text USING fts5(text, tokenize='trigram', detail='none');
- PRAGMA user_version=1;`;
+ PRAGMA user_version=2;`;
   try {
     db = new DatabaseSync(databasePath);
     db.exec(schema);
+    // Keep the legacy column so an older installed CLI / updater rollback can
+    // still use this derived cache, but never retain its redundant body copy.
+    db.exec("UPDATE documents SET folded='' WHERE folded<>''");
   } catch (error) {
     try {
       db?.close();
@@ -43,8 +46,8 @@ function ensureIndex() {
   remove = db.prepare('DELETE FROM documents WHERE path=?');
   removeText = db.prepare('DELETE FROM document_text WHERE rowid=?');
   upsert =
-    db.prepare(`INSERT INTO documents(path,root,name,relativePath,modifiedAt,changedAt,bytes,inode,content,folded) VALUES(?,?,?,?,?,?,?,?,?,?)
- ON CONFLICT(path) DO UPDATE SET root=excluded.root,name=excluded.name,relativePath=excluded.relativePath,modifiedAt=excluded.modifiedAt,changedAt=excluded.changedAt,bytes=excluded.bytes,inode=excluded.inode,content=excluded.content,folded=excluded.folded`);
+    db.prepare(`INSERT INTO documents(path,root,name,relativePath,modifiedAt,changedAt,bytes,inode,content,folded) VALUES(?,?,?,?,?,?,?,?,?,'')
+ ON CONFLICT(path) DO UPDATE SET root=excluded.root,name=excluded.name,relativePath=excluded.relativePath,modifiedAt=excluded.modifiedAt,changedAt=excluded.changedAt,bytes=excluded.bytes,inode=excluded.inode,content=excluded.content,folded=''`);
   setText = db.prepare('INSERT INTO document_text(rowid,text) VALUES(?,?)');
   rowId = db.prepare('SELECT rowid FROM documents WHERE path=?');
 }
@@ -129,6 +132,11 @@ function snapshot({ projects, opened, query = '', projectId, limit = 150, offset
         .map((row) => [row.path, row]),
     );
     for (const [file, root] of found) {
+      if (performance.now() >= budget.deadline) {
+        for (const remainingRoot of found.values()) incomplete.add(remainingRoot);
+        stats.limited = true;
+        break;
+      }
       const old = previous.get(file);
       try {
         const s = fs.lstatSync(file);
@@ -146,9 +154,8 @@ function snapshot({ projects, opened, query = '', projectId, limit = 150, offset
         budget.bytes += stat.size;
         stats.filesRead++;
         const name = path.basename(file),
-          relative = path.relative(root, file),
-          folded = content.toLowerCase();
-        upsert.run(file, root, name, relative, ...signature(stat), content, folded);
+          relative = path.relative(root, file);
+        upsert.run(file, root, name, relative, ...signature(stat), content);
         const id = rowId.get(file).rowid;
         removeText.run(id);
         setText.run(id, (name + '\n' + relative + '\n' + content).toLowerCase());

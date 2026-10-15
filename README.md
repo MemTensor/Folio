@@ -40,7 +40,7 @@
 
 ### 安装桌面应用
 
-**[下载 Folio v0.5.0-beta.20 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.20/Folio-0.5.0-beta.20-arm64-mac.zip)** · [版本说明](CHANGELOG.md)
+**[下载 Folio v0.5.0-beta.21 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.21/Folio-0.5.0-beta.21-arm64-mac.zip)** · [版本说明](CHANGELOG.md)
 
 解压，将 `Folio.app` 放入应用程序文件夹，然后打开 Markdown 文件或项目目录。
 

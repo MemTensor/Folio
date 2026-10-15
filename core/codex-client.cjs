@@ -24,21 +24,23 @@ class CodexClient extends EventEmitter {
     this.buffer = '';
     this.child = null;
     this.starting = null;
+    this.generation = 0;
   }
   async start() {
     if (this.starting) return this.starting;
-    this.starting = this.launch().catch((error) => {
-      this.stop(error);
-      this.starting = null;
+    const generation = ++this.generation;
+    this.starting = this.launch(generation).catch((error) => {
+      if (generation === this.generation) this.stop(error);
       throw error;
     });
     return this.starting;
   }
-  async launch() {
+  async launch(generation) {
     await fs.mkdir(this.home, { recursive: true, mode: 0o700 });
     await fs.mkdir(this.cwd, { recursive: true, mode: 0o700 });
     const found = this.executable || (await findCodex());
     const runtime = await resolveCodexRuntime(found);
+    if (generation !== this.generation) throw failure('Codex 连接已断开，请重新连接。');
     const executable = runtime.executable;
     this.runtime = runtime;
     this.protocolReady = false;
@@ -273,6 +275,7 @@ class CodexClient extends EventEmitter {
       this.stop(failure('Codex 返回内容过大，请缩小文档范围后重试。'));
   }
   stop(error = failure('Codex 连接已断开，请重新连接。')) {
+    this.generation++;
     const child = this.child;
     this.child = null;
     this.starting = null;
@@ -292,8 +295,14 @@ class CodexClient extends EventEmitter {
     this.emit('disconnected', error);
   }
   async close() {
+    const starting = this.starting;
+    this.generation++;
     const child = this.child;
-    if (!child) return;
+    if (!child) {
+      this.starting = null;
+      await starting?.catch(() => {});
+      return;
+    }
     const exited = new Promise((resolve) => {
       const timer = setTimeout(resolve, 2500);
       child.once('exit', () => {
@@ -303,6 +312,7 @@ class CodexClient extends EventEmitter {
     });
     this.stop();
     await exited;
+    await starting?.catch(() => {});
   }
 }
 module.exports = { CodexClient, findCodex };

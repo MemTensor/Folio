@@ -31,6 +31,7 @@ export interface AgentContext {
   path: string;
   content: string;
   selection: { from: number; to: number } | null;
+  selectionUnsupported?: boolean;
 }
 interface Props {
   root: string;
@@ -146,7 +147,7 @@ export function AgentPanel({
   });
   const [context, setContext] = useState<AgentContext | null>(() => capture());
   const [scope, setScope] = useState<'document' | 'selection'>(() =>
-    context?.selection ? 'selection' : 'document',
+    context?.selection || context?.selectionUnsupported ? 'selection' : 'document',
   );
   const [references, setReferences] = useState<{ path: string; name: string }[]>([]);
   const [picker, setPicker] = useState(false);
@@ -216,7 +217,7 @@ export function AgentPanel({
   useEffect(() => {
     const selected = capture();
     setContext(selected);
-    setScope(selected?.selection ? 'selection' : 'document');
+    setScope(selected?.selection || selected?.selectionUnsupported ? 'selection' : 'document');
   }, [doc?.path]);
   useEffect(() => {
     if (follow.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
@@ -824,7 +825,9 @@ export function AgentPanel({
         )}
         {staleSelection && (
           <p className="agent-status-note">
-            {t('选区已变化，请重新选择文字。')}
+            {context?.selectionUnsupported
+              ? t('无法准确定位这段选区，请在源码模式中选择。')
+              : t('选区已变化，请重新选择文字。')}
             <button
               onClick={() => {
                 setContext(capture());
@@ -851,7 +854,17 @@ export function AgentPanel({
               if (next?.selection) {
                 setContext(next);
                 setScope('selection');
-              } else setProblem(t('请先在文档中选择文字。'));
+              } else {
+                if (next?.selectionUnsupported) {
+                  setContext(next);
+                  setScope('selection');
+                }
+                setProblem(
+                  next?.selectionUnsupported
+                    ? t('无法准确定位这段选区，请在源码模式中选择。')
+                    : t('请先在文档中选择文字。'),
+                );
+              }
             }}
           >
             <TextAlignLeft size={13} />

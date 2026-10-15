@@ -179,3 +179,25 @@ test('only dynamic document calls reach the owner; approvals and requests after 
   await new Promise((resolve) => setImmediate(resolve));
   assert(!sent.some((frame) => frame.id === 'read-late'));
 });
+
+test('closing before runtime resolution prevents a late child spawn', async (t) => {
+  const directory = await mkdtemp('/private/tmp/folio-codex-close-');
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  let spawns = 0;
+  const client = new CodexClient({
+    home: directory + '/home',
+    cwd: directory + '/cwd',
+    version: 'test',
+    executable: '/generated/codex',
+    spawnProcess: () => {
+      spawns++;
+      throw Error('late spawn');
+    },
+  });
+  const started = client.start();
+  const rejected = assert.rejects(started, { code: 'AGENT_CONNECTION' });
+  await client.close();
+  await rejected;
+  assert.equal(spawns, 0);
+  assert.equal(client.child, null);
+});

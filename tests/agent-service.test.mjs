@@ -758,3 +758,34 @@ test('higher thinking effort has a larger wait budget and shutdown is recorded d
   await service.close();
   assert.equal((await service.session(input.root)).messages.at(-1).stopReason, 'shutdown');
 });
+
+test('cancelling during thread or turn creation disposes late remote resources', async (t) => {
+  for (const delayed of ['thread/start', 'turn/start']) {
+    const { service, client, input } = await fixture(t);
+    await service.connect();
+    const request = client.request;
+    let release, entered;
+    const waiting = new Promise((resolve) => (release = resolve));
+    const reached = new Promise((resolve) => (entered = resolve));
+    client.request = async (method, params) => {
+      if (method === delayed) {
+        entered();
+        await waiting;
+      }
+      return request(method, params);
+    };
+    await service.send(input);
+    await reached;
+    await service.cancel(input.root);
+    release();
+    await until(
+      () =>
+        client.calls.some((call) => call.method === 'thread/unsubscribe') &&
+        (delayed === 'thread/start' ||
+          client.calls.some((call) => call.method === 'turn/interrupt')),
+    );
+    assert.equal(service.active, null);
+    assert.equal((await service.session(input.root)).messages.at(-1).status, 'interrupted');
+    await service.close();
+  }
+});

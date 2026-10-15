@@ -7,7 +7,11 @@ const { within } = require('./file-store.cjs');
 // also keep real user documents here. Only admit a project below a provider,
 // never the CloudStorage aggregate or a whole provider account.
 function libraryDocuments(root, home) {
-  if (within(path.join(home, 'Library/Mobile Documents'), root)) return true;
+  const mobile = path.join(home, 'Library/Mobile Documents');
+  if (within(mobile, root)) {
+    const parts = path.relative(mobile, root).split(path.sep);
+    return parts.length >= 2 && parts.every((part) => part && !part.startsWith('.'));
+  }
   const cloudStorage = path.join(home, 'Library/CloudStorage');
   if (!within(cloudStorage, root)) return false;
   const parts = path.relative(cloudStorage, root).split(path.sep);

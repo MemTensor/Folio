@@ -1,3 +1,4 @@
+import buildPaths from '../core/build-output.cjs';
 import fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import path from 'node:path';
@@ -158,7 +159,7 @@ export async function prepareRelease({
     '仅允许准备当前私有 Folio 项目。',
   );
   const version = releaseVersion(pkg.version),
-    output = path.resolve(root, pkg.build.directories.output);
+    output = buildPaths.buildOutput(root, pkg);
   check(
     path.relative(root, output).split(path.sep)[0] !== '..' && output !== root,
     '构建产物目录必须位于仓库内。',

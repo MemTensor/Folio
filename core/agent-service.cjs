@@ -621,6 +621,7 @@ class AgentService {
       repairs: 0,
       previews: 0,
       completedTurns: new Set(),
+      client: this.client,
       handlingCompletion: false,
       awaitingTurn: false,
       startedAt: Date.now(),
@@ -645,7 +646,8 @@ class AgentService {
     return structuredClone(session);
   }
   async run(task, previous) {
-    const thread = await this.client.request('thread/start', {
+    const client = task.client;
+    const thread = await client.request('thread/start', {
       model: task.model.id,
       cwd: this.cwd,
       approvalPolicy: 'never',
@@ -666,9 +668,11 @@ class AgentService {
         : {}),
       config: { web_search: 'disabled' },
     });
-    if (this.active !== task) return;
     task.threadId = thread.thread.id;
-    if (task.cancelled) return this.finish(task, 'interrupted');
+    if (this.active !== task || task.cancelled) {
+      await client.request('thread/unsubscribe', { threadId: task.threadId }).catch(() => {});
+      return;
+    }
     const { input } = task;
     const editable = input.selection
       ? input.content.slice(input.selection.from, input.selection.to)
@@ -696,7 +700,7 @@ class AgentService {
           ? TOOLS.map(({ name, description }) => ({ name, description }))
           : [],
     });
-    const result = await this.client.request('turn/start', {
+    const result = await client.request('turn/start', {
       threadId: task.threadId,
       input: [{ type: 'text', text: prompt }],
       outputSchema:
@@ -708,7 +712,13 @@ class AgentService {
       effort: task.effort,
       ...(this.provider === 'api' ? { timeoutMs: task.timeoutBudget } : {}),
     });
-    if (this.active !== task) return;
+    if (this.active !== task || task.cancelled) {
+      await client
+        .request('turn/interrupt', { threadId: task.threadId, turnId: result.turn.id })
+        .catch(() => {});
+      await client.request('thread/unsubscribe', { threadId: task.threadId }).catch(() => {});
+      return;
+    }
     task.turnId = result.turn.id;
     if (task.cancelled) return this.cancel(task.root);
     this.touchTask(task, true);
@@ -952,7 +962,7 @@ class AgentService {
           task.awaitingTurn = true;
           task.handlingCompletion = false;
           this.touchTask(task, true);
-          const next = await this.client.request('turn/start', {
+          const next = await task.client.request('turn/start', {
             threadId: task.threadId,
             input: [],
             toolOutput: {
@@ -973,7 +983,7 @@ class AgentService {
             task.turnId = next.turn.id;
             task.awaitingTurn = false;
           } else if (this.active !== task)
-            void this.client
+            void task.client
               .request('turn/interrupt', { threadId: task.threadId, turnId: next.turn.id })
               .catch(() => {});
           return;
@@ -1054,7 +1064,7 @@ class AgentService {
     task.awaitingTurn = true;
     task.handlingCompletion = false;
     this.touchTask(task, true);
-    const next = await this.client.request('turn/start', {
+    const next = await task.client.request('turn/start', {
       threadId: task.threadId,
       input: [
         {
@@ -1084,7 +1094,7 @@ class AgentService {
       task.turnId = next.turn.id;
       task.awaitingTurn = false;
     } else if (this.active !== task)
-      void this.client
+      void task.client
         .request('turn/interrupt', { threadId: task.threadId, turnId: next.turn.id })
         .catch(() => {});
   }
@@ -1153,7 +1163,7 @@ class AgentService {
     this.emitSession(task.session);
     await this.persist(task.session);
     if (task.threadId)
-      void this.client.request('thread/unsubscribe', { threadId: task.threadId }).catch(() => {});
+      void task.client.request('thread/unsubscribe', { threadId: task.threadId }).catch(() => {});
     this.scheduleIdle();
   }
   completeFailure(task = this.active) {
@@ -1175,12 +1185,12 @@ class AgentService {
     task.stopReason = reason;
     if (task.threadId && task.turnId) {
       try {
-        await this.client.request('turn/interrupt', {
+        await task.client.request('turn/interrupt', {
           threadId: task.threadId,
           turnId: task.turnId,
         });
       } catch {
-        this.client.stop();
+        task.client.stop();
       }
     }
     await this.finish(

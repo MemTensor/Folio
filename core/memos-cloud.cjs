@@ -59,10 +59,19 @@ class MemosCloud {
       collections: c.collections || [],
     };
   }
-  async key() {
+  async key(configuration) {
     if (this.overrides.apiKey) return this.overrides.apiKey;
     if (process.env.MEMOS_API_KEY) return process.env.MEMOS_API_KEY;
-    const c = await this.config();
+    const c = configuration || (await this.config());
+    const saved = await readJSON(this.configPath(), {});
+    const credential = await readJSON(path.join(this.dataDir, 'cloud', 'credential.json'), {});
+    const boundURL = c.keyFile ? saved.baseURL : credential.baseURL || saved.baseURL;
+    if (
+      !process.env.MEMOS_API_KEY_FILE &&
+      (c.keyFile || credential.apiKey) &&
+      checkURL(c.baseURL) !== checkURL(boundURL || DEFAULT_URL)
+    )
+      throw new CloudError('修改 API 地址时，请重新填写对应的 API Key。', 'CONFIG');
     const keyFile = process.env.MEMOS_API_KEY_FILE || c.keyFile;
     if (keyFile) {
       const stat = await fs.stat(keyFile);
@@ -70,7 +79,7 @@ class MemosCloud {
         throw new CloudError('凭据文件权限过宽，请设置为 600。', 'CONFIG');
       return (await fs.readFile(keyFile, 'utf8')).trim();
     }
-    return (await readJSON(path.join(this.dataDir, 'cloud', 'credential.json'), {})).apiKey || null;
+    return credential.apiKey || null;
   }
   async status(workspace) {
     const c = await this.config();
@@ -130,6 +139,15 @@ class MemosCloud {
         userId: userId || old.userId || 'folio-' + crypto.randomUUID(),
         collections: old.collections || [],
       };
+      if (
+        c.baseURL !== checkURL(old.baseURL || DEFAULT_URL) &&
+        !apiKey &&
+        !keyFile &&
+        !clearKey &&
+        (old.keyFile ||
+          (await readJSON(path.join(this.dataDir, 'cloud', 'credential.json'), {})).apiKey)
+      )
+        throw new CloudError('修改 API 地址时，请重新填写对应的 API Key。', 'CONFIG');
       if (keyFile) {
         const stat = await fs.stat(keyFile);
         if (!stat.isFile() || (process.platform !== 'win32' && stat.mode & 0o077))
@@ -140,6 +158,7 @@ class MemosCloud {
         delete c.keyFile;
         await writeJSON(path.join(this.dataDir, 'cloud', 'credential.json'), {
           apiKey: apiKey.trim(),
+          baseURL: c.baseURL,
         });
       }
       if (clearKey) {
@@ -153,8 +172,10 @@ class MemosCloud {
     });
   }
   async request(endpoint, payload, { write = false } = {}) {
-    const cfg = await this.config(),
-      key = await this.key();
+    const { cfg, key } = await withLock(this.dataDir, 'cloud-config', async () => {
+      const cfg = await this.config();
+      return { cfg, key: await this.key(cfg) };
+    });
     if (!key) throw new CloudError('请先在 Folio 的云知识设置中配置 API Key。', 'NOT_CONFIGURED');
     const url = checkURL(cfg.baseURL) + endpoint;
     let response;
@@ -215,12 +236,15 @@ class MemosCloud {
     if (!id) throw new CloudError('云端已响应，但未返回知识集合 ID。', 'REMOTE_UNCERTAIN');
     await withLock(this.dataDir, 'cloud-config', async () => {
       const cfg = await this.config();
-      delete cfg.keyFile;
       const old = await readJSON(this.configPath(), {});
+      // Environment/constructor overrides are request-scoped, not saved settings.
+      if (
+        checkURL(cfg.baseURL) !== checkURL(old.baseURL || DEFAULT_URL) ||
+        cfg.userId !== (old.userId || 'folio-default')
+      )
+        return;
       await writeJSON(this.configPath(), {
         ...old,
-        baseURL: cfg.baseURL,
-        userId: cfg.userId,
         collections: [...cfg.collections.filter((c) => c.id !== id), { id, name: name.trim() }],
         defaultCollection: id,
       });
