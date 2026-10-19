@@ -1,6 +1,6 @@
 # 参与开发
 
-Folio 是人与 Agent 共用的本地 Markdown 文档工作台。源码采用 Apache-2.0，版权主体为 MemTensor，作者为 Zehao Lin；仓库仍为私有，本说明供已获访问权限的协作者使用。
+Folio 是人与 Agent 共用的本地 Markdown 文档工作台。源码采用 Apache-2.0，版权主体为 MemTensor，作者为 Zehao Lin；欢迎报告问题与提出改进，贡献前请先阅读开发与数据边界说明。
 
 ## 开始
 

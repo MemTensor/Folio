@@ -41,7 +41,7 @@ export function releaseNotes(changelog, tag) {
     .join('\n')
     .trim();
   check(content.length > 0, '发布说明不能为空。');
-  return `# Folio ${tag}\n\n${content}\n\n## 下载与安装\n\n下载 macOS Apple Silicon ZIP，解压后将 Folio.app 放入应用程序文件夹。SHA256SUMS.txt 用于核对安装包。\n\n当前安装包未进行 Developer ID 签名和公证。私有仓库下载需要有访问权限的 GitHub 账号。\n`;
+  return `# Folio ${tag}\n\n${content}\n\n## 下载与安装\n\n下载 macOS Apple Silicon ZIP，解压后将 Folio.app 放入应用程序文件夹。SHA256SUMS.txt 用于核对安装包。\n\n当前安装包未进行 Developer ID 签名和 Apple 公证。后续版本见 [MemTensor/Folio Releases](${repository.RELEASE_PAGE})。\n`;
 }
 async function hashFile(file) {
   const hash = crypto.createHash('sha256');
@@ -156,7 +156,7 @@ export async function prepareRelease({
   const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
   check(
     pkg.private === true && pkg.build?.appId === 'io.folio.markdown',
-    '仅允许准备当前私有 Folio 项目。',
+    '仅允许准备当前 Folio 桌面应用项目。',
   );
   const version = releaseVersion(pkg.version),
     output = buildPaths.buildOutput(root, pkg);
@@ -226,7 +226,12 @@ function verifyAssets(release, assets, { complete = false } = {}) {
       );
   }
 }
-export async function publishRelease(plan, { root, command = defaultCommand } = {}) {
+export async function publishRelease(
+  plan,
+  { root, command = defaultCommand, visibility = 'private' } = {},
+) {
+  check(['private', 'public'].includes(visibility), '发布可见性必须为 private 或 public。');
+  const expectedPrivate = visibility === 'private';
   check(root && plan.repository === REPOSITORY && SHA.test(plan.commit), '发布计划无效。');
   const env = commandEnvironment(),
     temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'folio-release-'));
@@ -288,8 +293,8 @@ export async function publishRelease(plan, { root, command = defaultCommand } = 
     check(head === plan.commit, 'HEAD 在准备后发生变化。');
     const repository = await api(`repos/${REPOSITORY}`);
     check(
-      repository.full_name === REPOSITORY && repository.private === true,
-      `目标仓库必须仍为 ${REPOSITORY} 私有仓库。`,
+      repository.full_name === REPOSITORY && repository.private === expectedPrivate,
+      `目标仓库可见性必须与本次发布选择一致：${REPOSITORY} (${visibility})。`,
     );
     let branch;
     try {
@@ -380,7 +385,10 @@ export async function publishRelease(plan, { root, command = defaultCommand } = 
     );
     verifyAssets(release, plan.assets, { complete: true });
     const finalRepository = await api(`repos/${REPOSITORY}`);
-    check(finalRepository.private === true, '仓库可见性已变化，已停止发布。');
+    check(
+      finalRepository.full_name === REPOSITORY && finalRepository.private === expectedPrivate,
+      '仓库可见性已变化，已停止发布。',
+    );
     await gh([
       'release',
       'edit',
@@ -415,6 +423,12 @@ export function parseArgs(args) {
       check(!mode, '只能指定一种运行模式。');
       mode = arg;
       options.publish = arg === '--publish';
+    } else if (arg === '--visibility') {
+      check(
+        !options.visibility && ['private', 'public'].includes(args[i + 1]),
+        '--visibility 需要 private 或 public。',
+      );
+      options.visibility = args[++i];
     } else if (arg === '--commit') {
       check(!options.commit && SHA.test(args[i + 1] || ''), '--commit 需要完整的小写 SHA。');
       options.commit = args[++i];
@@ -428,11 +442,11 @@ export async function main(args = process.argv.slice(2), options = {}) {
     root = options.root || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   if (parsed.help)
     return {
-      help: 'node scripts/publish-release.mjs [--prepare|--dry-run|--publish] [--commit FULL_SHA]\nDefault prepares local SHA256SUMS.txt, RELEASE_NOTES.md and release-plan.json only. --publish requires a clean, pushed HEAD and preserves private repository visibility.',
+      help: 'node scripts/publish-release.mjs [--prepare|--dry-run|--publish] [--commit FULL_SHA] [--visibility private|public]\nDefault prepares local assets only. Publication requires a clean, pushed HEAD and matching repository visibility (private by default). Public releases require --visibility public. Repository visibility is never changed.',
     };
   const plan = await prepareRelease({ ...options, root, commit: parsed.commit });
   return parsed.publish
-    ? publishRelease(plan, { ...options, root })
+    ? publishRelease(plan, { ...options, root, visibility: parsed.visibility })
     : {
         state: 'prepared',
         tag: plan.tag,

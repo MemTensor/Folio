@@ -201,6 +201,8 @@ test('release semver and notes reject ambiguity and omit development heading ann
   assert(notes.includes('- New.'));
   assert(!notes.includes('Old.'));
   assert(!notes.includes('待发布'));
+  assert(!notes.includes('私有仓库'));
+  assert(notes.includes('https://github.com/MemTensor/Folio/releases'));
 });
 test('default prepare and dry-run only generate local verified assets', async (t) => {
   const f = await fixture(t);
@@ -329,4 +331,37 @@ test('publication rejects an actual ZIP missing the CLI or future updater helper
     await assert.rejects(prepareRelease(f), /安装包缺少/);
     assert.deepEqual(mutations(f.state), []);
   }
+});
+
+test('public publication requires an explicit matching visibility selection', async (t) => {
+  const f = await fixture(t),
+    plan = await prepareRelease(f);
+  f.state.private = false;
+  await assert.rejects(publishRelease(plan, f), /可见性/);
+  assert.deepEqual(mutations(f.state), []);
+  assert.deepEqual(parseArgs(['--publish', '--visibility', 'public']), {
+    publish: true,
+    visibility: 'public',
+  });
+  assert.throws(() => parseArgs(['--visibility', 'internal']));
+  const result = await publishRelease(plan, { ...f, visibility: 'public' });
+  assert.equal(result.state, 'published');
+  assert.equal(f.state.private, false);
+  assert(!f.state.calls.some((c) => c.binary === 'gh' && c.args[0] === 'repo'));
+});
+
+test('a visibility change during asset upload leaves the draft unpublished', async (t) => {
+  const f = await fixture(t),
+    plan = await prepareRelease(f);
+  f.state.private = false;
+  const command = async (binary, args, options) => {
+    const result = await f.command(binary, args, options);
+    if (binary === 'gh' && args[0] === 'release' && args[1] === 'upload') f.state.private = true;
+    return result;
+  };
+  await assert.rejects(
+    publishRelease(plan, { ...f, command, visibility: 'public' }),
+    /可见性已变化/,
+  );
+  assert.equal(f.state.release.draft, true);
 });

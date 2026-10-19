@@ -28,7 +28,7 @@ Unzip the download and move `Folio.app` to Applications.
 
 The interface supports Simplified Chinese and English. Press **⌘ ,** for categorized settings. Find updates through **Folio → Check for updates** or **Settings → About and updates**.
 
-> Private beta; downloads require repository access. Developer ID signing and Apple notarization are pending. See [installation and updates](docs/更新说明.md) and [distribution details](docs/开源与分发说明.md).
+> Beta for macOS Apple Silicon. Developer ID signing and Apple notarization are pending. See [installation and updates](docs/更新说明.md) and [distribution details](docs/开源与分发说明.md).
 
 ## Document workspace
 
