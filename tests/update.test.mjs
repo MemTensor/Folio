@@ -568,3 +568,27 @@ test('aborted preparation must settle before a new install request can begin', a
   assert.equal((await commit).code, 'STALE_REQUEST');
   assert.equal(service.ticket, null);
 });
+
+test('a consumed ticket does not expire during slow extraction, while document guards remain active', async (t) => {
+  const { service, calls } = await setup(t);
+  await service.check();
+  await service.download();
+  const { requestId } = service.beginInstall();
+  const prepare = service.installer.prepare;
+  service.installer.prepare = async (args) => {
+    const result = await prepare(args);
+    service.ticket.expires = 0;
+    return result;
+  };
+  await service.commitInstall({ requestId, parentPid: process.pid });
+  assert.equal(calls.launch, 1);
+  assert.equal(calls.abort, 0);
+});
+
+test('an unconfirmed startup explains the retained backup instead of silently looking idle', async (t) => {
+  const { service } = await setup(t);
+  service.installer.readResult = async () => ({ status: 'awaiting-confirmation' });
+  const status = await service.status();
+  assert.match(status.message, /启动确认/);
+  assert.match(status.message, /备份/);
+});

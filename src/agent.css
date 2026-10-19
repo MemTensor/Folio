@@ -766,3 +766,18 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.agent-api-settings label.agent-image-input {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.6;
+}
+.agent-api-settings .agent-image-input input {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  margin-top: 2px;
+  border: 0;
+  flex: none;
+}

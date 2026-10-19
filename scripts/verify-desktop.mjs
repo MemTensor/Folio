@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const args = process.argv.slice(2);
 const usage =
-  'Usage: node scripts/verify-desktop.mjs [--dist DIRECTORY] [--scenario normal|home|first-run|table-edit|block-select|formula-preview|agent|all] [--language zh-CN|en] [--capture-dir DIRECTORY]';
+  'Usage: node scripts/verify-desktop.mjs [--dist DIRECTORY] [--scenario normal|lifecycle|home|first-run|table-edit|block-select|formula-preview|agent|all] [--language zh-CN|en] [--capture-dir DIRECTORY]';
 const options = {
   dist: path.join(root, 'dist'),
   scenario: 'normal',
@@ -25,6 +25,7 @@ for (let i = 0; i < args.length; i++) {
     flag === '--scenario' &&
     [
       'normal',
+      'lifecycle',
       'home',
       'first-run',
       'table-edit',
@@ -48,7 +49,16 @@ if (options.captureDir) {
 const electron = createRequire(import.meta.url)('electron');
 const scenarios =
   options.scenario === 'all'
-    ? ['normal', 'home', 'first-run', 'table-edit', 'block-select', 'formula-preview', 'agent']
+    ? [
+        'normal',
+        'lifecycle',
+        'home',
+        'first-run',
+        'table-edit',
+        'block-select',
+        'formula-preview',
+        'agent',
+      ]
     : [options.scenario];
 for (const scenario of scenarios) {
   const temporary = await realpath(await mkdtemp(path.join(os.tmpdir(), 'folio-desktop-check-')));

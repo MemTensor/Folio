@@ -18,7 +18,7 @@ Plans, experiment notes and technical proposals may come from you, Claude Code, 
 
 ## Get started
 
-**[Download Folio v0.5.0-beta.22 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.22/Folio-0.5.0-beta.22-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
+**[Download Folio v0.5.0-beta.23 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.23/Folio-0.5.0-beta.23-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
 
 Unzip the download and move `Folio.app` to Applications.
 
@@ -73,7 +73,7 @@ Choose the model and reasoning effort in the panel. Agent tools provide document
 | Connection | Setup |
 | --- | --- |
 | ChatGPT subscription | Install [Codex CLI](https://learn.chatgpt.com/docs/cli), connect in Agent settings and complete official sign-in using your account's Codex access |
-| OpenAI-compatible API | Enter the service URL, your API Key and model name; requests use that service's API allowance |
+| OpenAI-compatible API | Enter the service URL, your API Key and model name; enable image input only for a model that supports it |
 
 **Use a compatible API** opens API configuration directly. Known authentication and address errors can take you to the relevant field. When you enter settings from a document, saving or completing sign-in returns you to the same conversation with your unsent instruction and cursor selection intact. Entering from application settings returns you to the previous category.
 

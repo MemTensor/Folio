@@ -74,6 +74,10 @@ class UpdateService {
           this.emit({ message: '上次更新未能启动，已恢复旧版本。' });
         else if (result?.status === 'failed')
           this.emit({ message: '上次更新未完成，原应用和恢复草稿已保留。' });
+        else if (result?.status === 'awaiting-confirmation')
+          this.emit({
+            message: '上次更新尚未完成启动确认，旧版本备份仍保留。请正常退出并重新打开应用。',
+          });
         else if (result?.status === 'confirmed' && result.version === this.currentVersion)
           this.emit({
             message: '已更新到 {version}。',
@@ -250,7 +254,11 @@ class UpdateService {
     return true;
   }
   assertTicket(requestId) {
-    if (!this.ticket || this.ticket.requestId !== requestId || Date.now() > this.ticket.expires)
+    if (
+      !this.ticket ||
+      this.ticket.requestId !== requestId ||
+      (!this.ticket.consumed && Date.now() > this.ticket.expires)
+    )
       throw new UpdateError('STALE_REQUEST', '更新确认已失效，请重新操作。');
   }
   async commitInstall({ requestId, parentPid, guard = () => true }) {

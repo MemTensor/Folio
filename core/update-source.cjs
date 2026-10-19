@@ -79,7 +79,13 @@ class GitHubUpdateSource {
   }
   async fromGh(gh, endpoint, { signal, timeout, binary, consume }) {
     const env = {
-      ...process.env,
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(([key]) =>
+          /^(HOME|USER|LOGNAME|SHELL|PATH|TMPDIR|TMP|TEMP|LANG|LC_.*|TZ|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|https?_proxy|all_proxy|no_proxy|SSL_CERT_FILE|SSL_CERT_DIR|GH_TOKEN|GITHUB_TOKEN|GH_CONFIG_DIR|XDG_CONFIG_HOME|SSH_AUTH_SOCK)$/.test(
+            key,
+          ),
+        ),
+      ),
       GH_PROMPT_DISABLED: '1',
       GH_PAGER: 'cat',
       PAGER: 'cat',
@@ -205,8 +211,8 @@ class GitHubUpdateSource {
   }
   async listReleases({ signal } = {}) {
     const items = [];
-    for (let page = 1; page <= 10; page++) {
-      const bytes = await this.request(`repos/${REPOSITORY}/releases?per_page=100&page=${page}`, {
+    for (let page = 1; page <= 40; page++) {
+      const bytes = await this.request(`repos/${REPOSITORY}/releases?per_page=25&page=${page}`, {
         signal,
       });
       let rows;
@@ -218,7 +224,7 @@ class GitHubUpdateSource {
       if (!Array.isArray(rows))
         throw new UpdateError('BAD_RESPONSE', '更新服务返回了无法识别的信息。');
       items.push(...rows);
-      if (rows.length < 100) return items;
+      if (rows.length < 25) return items;
     }
     throw new UpdateError('INCOMPLETE', '版本记录较多，暂时无法完整核对，请打开发布页面查看。');
   }

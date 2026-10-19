@@ -1,4 +1,4 @@
-export function parseTable(raw) {
+export function parseTable(raw, headers = ['项目', '说明']) {
   const rows = raw
     .trim()
     .split('\n')
@@ -19,11 +19,7 @@ export function parseTable(raw) {
     );
   if (rows.length < 2)
     return {
-      cells: [
-        ['项目', '说明'],
-        ['', ''],
-        ['', ''],
-      ],
+      cells: [headers.slice(), ['', ''], ['', '']],
       align: ['default', 'default'],
     };
   const width = Math.max(...rows.map((r) => r.length));

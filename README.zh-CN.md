@@ -25,7 +25,7 @@
 
 ## 开始使用
 
-**[下载 Folio v0.5.0-beta.22 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.22/Folio-0.5.0-beta.22-arm64-mac.zip)** · [更新记录](CHANGELOG.md)
+**[下载 Folio v0.5.0-beta.23 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.23/Folio-0.5.0-beta.23-arm64-mac.zip)** · [更新记录](CHANGELOG.md)
 
 解压后将 `Folio.app` 放入“应用程序”文件夹。
 
@@ -80,7 +80,7 @@
 | 接入方式 | 如何配置 |
 | --- | --- |
 | ChatGPT 订阅 | 安装 [Codex CLI](https://learn.chatgpt.com/docs/cli)，在 Agent 设置中连接并完成官方页面登录，使用账号提供的 Codex 额度 |
-| OpenAI 兼容 API | 填写服务地址、自己的 API Key 和模型名称，使用该服务的 API 额度 |
+| OpenAI 兼容 API | 填写服务地址、自己的 API Key 和模型名称；支持图片的模型可另行启用图片输入 |
 
 “使用兼容 API”直接打开 API 配置；已知授权或地址错误可定位到相应输入项。从文档进入设置后，保存或登录完成会返回原对话，保留尚未发送的指令与光标选区。从应用设置进入则返回原分类。
 

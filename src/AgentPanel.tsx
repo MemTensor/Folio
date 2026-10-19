@@ -97,14 +97,14 @@ const Reply = memo(function Reply({ text, complete }: { text: string; complete: 
   }, [text, complete, allowed]);
   const html = useMemo(
     () =>
-      allowed
+      allowed && complete
         ? DOMPurify.sanitize(renderMarkdown(text), {
             FORBID_TAGS: ['img', 'iframe', 'audio', 'video', 'source'],
           })
         : '',
-    [text, allowed],
+    [text, allowed, complete],
   );
-  if (!allowed) return <pre className="agent-plain-reply">{text}</pre>;
+  if (!allowed || !complete) return <pre className="agent-plain-reply">{text}</pre>;
   return (
     <div
       ref={holder}

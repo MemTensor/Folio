@@ -1,3 +1,4 @@
+const { UUID } = require('./identifiers.cjs');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -49,15 +50,41 @@ class DingTalkSync {
     this.client = client;
   }
   bindingFile(id) {
+    if (typeof id !== 'string' || !UUID.test(id))
+      throw new DingTalkError('文档身份无效，请重新打开项目。', 'CONFIG');
     return path.join(this.dataDir, 'dingtalk', 'documents', id + '.json');
   }
   planFile(id) {
-    if (!/^[a-f0-9-]{36}$/.test(id)) throw new DingTalkError('同步计划无效。', 'USAGE');
+    if (typeof id !== 'string' || !UUID.test(id))
+      throw new DingTalkError('同步计划无效。', 'USAGE');
     return path.join(this.dataDir, 'dingtalk', 'plans', id + '.json');
   }
   visible(binding) {
-    const { jsonml, ...value } = binding;
-    return value;
+    const fields = [
+      'documentId',
+      'path',
+      'root',
+      'profile',
+      'account',
+      'nodeId',
+      'url',
+      'name',
+      'state',
+      'planId',
+      'sourceRevision',
+      'packageHash',
+      'startedAt',
+      'syncedAt',
+      'remoteRevision',
+      'reason',
+      'stage',
+      'runtimeVerification',
+      'requiresReview',
+      'recoveryId',
+    ];
+    return Object.fromEntries(
+      fields.filter((key) => Object.hasOwn(binding, key)).map((key) => [key, binding[key]]),
+    );
   }
   async info(knowledge, p) {
     const { file, document } = await knowledge.inspect(p);
@@ -74,6 +101,25 @@ class DingTalkSync {
       ...connection,
       binding: binding ? this.visible(binding) : null,
     };
+  }
+  async pruneExpiredPlans() {
+    const directory = path.join(this.dataDir, 'dingtalk', 'plans');
+    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    let scanned = 0,
+      removed = 0;
+    const entries = await fs.opendir(directory);
+    for await (const entry of entries) {
+      if (++scanned > 2048 || removed >= 32) break;
+      if (!entry.isFile() || !entry.name.endsWith('.json') || !UUID.test(entry.name.slice(0, -5)))
+        continue;
+      const file = path.join(directory, entry.name);
+      const stat = await fs.lstat(file).catch(() => null);
+      if (!stat?.isFile() || Date.now() - stat.mtimeMs < 24 * 60 * 60 * 1000) continue;
+      if (process.getuid && stat.uid !== process.getuid()) continue;
+      await fs.unlink(file).catch(() => {});
+      removed++;
+    }
+    return removed;
   }
   async plan(knowledge, p, { profile, diagrams = [], expectedRevision } = {}) {
     const { file, document } = await knowledge.inspect(p);
@@ -133,6 +179,7 @@ class DingTalkSync {
           }
         : {}),
     };
+    await this.pruneExpiredPlans();
     await writeJSON(this.planFile(plan.id), plan);
     const { jsonml, assets, ...visible } = plan;
     return visible;

@@ -26,10 +26,18 @@ try {
       path.join(resources, 'default_app.asar'),
       path.join(bundle, 'Contents/Resources/app.asar'),
     );
-    await writeFile(
-      path.join(bundle, 'Contents/Resources/cli/folio.cjs'),
-      '// generated fixture\n',
-    );
+    for (const relative of [
+      'bin/folio',
+      'cli/folio.cjs',
+      'cli/index-worker.cjs',
+      'cli/resvg.wasm',
+      'updater/folio-update-helper',
+      'updater/build-info.json',
+    ]) {
+      const file = path.join(bundle, 'Contents/Resources', relative);
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, '// generated fixture\n');
+    }
     await writeFile(
       path.join(bundle, 'Contents/Info.plist'),
       `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>io.folio.markdown</string><key>CFBundleExecutable</key><string>Folio</string><key>CFBundleShortVersionString</key><string>${version}</string><key>CFBundleVersion</key><string>${version}</string></dict></plist>`,

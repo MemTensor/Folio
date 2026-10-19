@@ -52,3 +52,5 @@ await build({
   format: 'cjs',
 });
 await copyFile(require.resolve('@resvg/resvg-wasm/index_bg.wasm'), 'dist-cli/resvg.wasm');
+
+for (const file of ['LICENSE', 'NOTICE']) await copyFile(file, path.join('dist-cli', file));

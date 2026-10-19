@@ -44,6 +44,17 @@ async function fixture(
       arch: 'arm64',
     }),
   );
+  for (const relative of [
+    'bin/folio',
+    'cli/folio.cjs',
+    'cli/index-worker.cjs',
+    'cli/resvg.wasm',
+    'updater/folio-update-helper',
+  ]) {
+    const file = path.join(contents, 'Resources', relative);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, 'generated runtime fixture');
+  }
   await fs.mkdir(output);
   const binary = Buffer.alloc(32);
   binary.writeUInt32LE(0xfeedfacf, 0);
@@ -309,4 +320,13 @@ test('a clean detached build may publish the exact pushed default-branch commit'
   const result = await publishRelease(plan, f);
   assert.equal(result.state, 'published');
   assert.equal(result.commit, HEAD);
+});
+
+test('publication rejects an actual ZIP missing the CLI or future updater helper', async (t) => {
+  for (const file of ['cli/folio.cjs', 'updater/folio-update-helper']) {
+    const f = await fixture(t);
+    await execute('/usr/bin/zip', ['-dq', f.zip, 'Folio.app/Contents/Resources/' + file]);
+    await assert.rejects(prepareRelease(f), /安装包缺少/);
+    assert.deepEqual(mutations(f.state), []);
+  }
 });

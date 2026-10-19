@@ -21,7 +21,7 @@ const path = require('node:path');
   });
   assert.deepEqual(await source.listReleases(), []);
   assert.deepEqual(requests, [
-    `https://api.github.com/repos/${expected}/releases?per_page=100&page=1`,
+    `https://api.github.com/repos/${expected}/releases?per_page=25&page=1`,
   ]);
   await assert.rejects(source.request('repos/glin93/folio/releases'), { code: 'BAD_SOURCE' });
   const { contextItems, popupContext } = require(path.join(resource, 'electron/context-menu.cjs'));

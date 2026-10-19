@@ -23,6 +23,10 @@ const path = require('node:path');
   const { DocumentLibrary } = require(
     path.join(bundle, 'Contents/Resources/app.asar/core/library.cjs'),
   );
+  const { DocumentSearch } = require(
+    path.join(bundle, 'Contents/Resources/app.asar/core/document-search.cjs'),
+  );
+  const documentSearch = new DocumentSearch();
   const library = new DocumentLibrary(path.join(temporary, 'library-state'));
   let session, change;
   const browser = new WorkspaceBrowser({ onChange: (event) => session.changed(event) });
@@ -135,8 +139,16 @@ const path = require('node:path');
     assert.equal(found.total, 1);
     assert.equal(found.documents[0].match.line, 2);
     assert.equal((await library.snapshot({ query: 'packaged-index-keyword' })).index.filesRead, 0);
+    const searched = await documentSearch.search(
+      catalogRoot,
+      path.join(temporary, 'search-state'),
+      'packaged-index-keyword',
+    );
+    assert.equal(searched.length, 1);
+    assert.equal(searched[0].line, 2);
     console.log(
       JSON.stringify({
+        packagedDocumentSearch: true,
         packagedSQLite: true,
         ok: true,
         packagedWorker: true,
@@ -157,6 +169,7 @@ const path = require('node:path');
       }),
     );
   } finally {
+    documentSearch.close();
     await library.close();
     await catalog.close();
     await session.close();

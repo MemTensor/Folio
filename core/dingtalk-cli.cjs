@@ -12,9 +12,11 @@ class DingTalkError extends Error {
 }
 const redact = (text) =>
   String(text)
+    .replace(/(\b(?:Bearer|Token)\s+)[^\s,}\"']+/gi, '$1[已隐藏]')
+    .replace(/((?:Authorization)\s*[=:]\s*)[^\r\n,}]+/gi, '$1[已隐藏]')
     .replace(/(?:gh[pousr]_|github_pat_|mpg-|sk-)[A-Za-z0-9_-]{16,}/g, '[已隐藏]')
     .replace(
-      /((?:access[_-]?token|refresh[_-]?token|appSecret|clientSecret)\s*[=:]\s*)[^\s,}"']+/gi,
+      /((?:access[_-]?token|refresh[_-]?token|appSecret|appKey|clientSecret|api[_-]?key)\s*[=:]\s*)[^\s,}"']+/gi,
       '$1[已隐藏]',
     );
 async function findDws() {
@@ -43,7 +45,13 @@ async function invokeDws(binary, args, { input, timeout = 45000 } = {}) {
         shell: false,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
-          ...process.env,
+          ...Object.fromEntries(
+            Object.entries(process.env).filter(([key]) =>
+              /^(HOME|USER|LOGNAME|SHELL|PATH|TMPDIR|TMP|TEMP|LANG|LC_.*|TZ|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|https?_proxy|all_proxy|no_proxy|SSL_CERT_FILE|SSL_CERT_DIR|NODE_EXTRA_CA_CERTS|DWS_.*|DINGTALK_.*)$/.test(
+                key,
+              ),
+            ),
+          ),
           PATH: [path.dirname(binary), process.env.PATH || '', '/usr/bin', '/bin'].join(
             path.delimiter,
           ),
@@ -102,12 +110,20 @@ async function invokeDws(binary, args, { input, timeout = 45000 } = {}) {
                   ? 'DWS_VALIDATION'
                   : 'DWS_ERROR',
               {
-                reason: error?.reason,
-                category,
+                reason:
+                  typeof error?.reason === 'string' && /^[a-z][a-z0-9_]{0,79}$/.test(error.reason)
+                    ? error.reason
+                    : undefined,
+                category: ['auth', 'validation', 'network', 'server'].includes(category)
+                  ? category
+                  : undefined,
                 exitCode: code,
-                nodeId: error?.details?.data?.nodeId,
+                nodeId:
+                  typeof error?.details?.data?.nodeId === 'string'
+                    ? redact(error.details.data.nodeId).slice(0, 200)
+                    : undefined,
                 executionStarted: error?.execution_started,
-                status: error?.details?.status,
+                status: Number.isInteger(error?.details?.status) ? error.details.status : undefined,
               },
             ),
           );

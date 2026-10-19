@@ -51,3 +51,11 @@ test('editing a table leaves untouched alignment markers byte-identical', () => 
   }
   assert.deepEqual(parseTable('| a |\n| --- |\n| 1 |').align, ['default']);
 });
+
+test('new English tables use English headers without changing existing Markdown cells', () => {
+  assert.deepEqual(parseTable('', ['Item', 'Description']).cells[0], ['Item', 'Description']);
+  assert.deepEqual(
+    parseTable('| 项目 | 说明 |\n| --- | --- |\n| a | b |', ['Item', 'Description']).cells[0],
+    ['项目', '说明'],
+  );
+});

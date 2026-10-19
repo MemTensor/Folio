@@ -107,7 +107,17 @@ function bundleEntries(version = nextVersion, changes = {}) {
       mode: 0o100755,
     },
     { name: 'Folio.app/Contents/Resources/app.asar', data: 'generated archive fixture' },
-    { name: 'Folio.app/Contents/Resources/cli/folio.cjs', data: 'generated CLI fixture' },
+    ...[
+      'bin/folio',
+      'cli/folio.cjs',
+      'cli/index-worker.cjs',
+      'cli/resvg.wasm',
+      'updater/folio-update-helper',
+      'updater/build-info.json',
+    ].map((file) => ({
+      name: 'Folio.app/Contents/Resources/' + file,
+      data: 'generated runtime fixture',
+    })),
   ];
 }
 async function fixture(t, options = {}) {
@@ -639,4 +649,43 @@ test('abort during helper startup cancels and reaps it before removing the stage
   assert.equal(f.installer.launching.size, 0);
   assert.equal(f.installer.launched.size, 0);
   await assertUnchanged(f);
+});
+
+test('an update missing any required runtime file never reaches installation', async (t) => {
+  for (const file of [
+    'cli/index-worker.cjs',
+    'cli/resvg.wasm',
+    'updater/folio-update-helper',
+    'updater/build-info.json',
+  ]) {
+    const f = await fixture(t);
+    const archive = await f.archive(
+      bundleEntries().filter((entry) => entry.name !== 'Folio.app/Contents/Resources/' + file),
+    );
+    await assert.rejects(f.installer.prepare(archive));
+    await assertUnchanged(f);
+  }
+});
+
+test('recovery rejects a plan naming a different transaction directory', async (t) => {
+  const f = await fixture(t),
+    id = randomUUID(),
+    nonce = 'generated-nonce';
+  const transactionDir = path.join(f.installer.directory, 'install-generated');
+  await fs.mkdir(transactionDir, { recursive: true });
+  await fs.writeFile(
+    f.installer.currentFile,
+    JSON.stringify({ id, nonce, version: nextVersion, transactionDir }),
+  );
+  await fs.writeFile(
+    path.join(transactionDir, 'plan.json'),
+    JSON.stringify({
+      id,
+      nonce,
+      version: nextVersion,
+      targetPath: f.currentBundle,
+      transactionDir: transactionDir + '-other',
+    }),
+  );
+  await assert.rejects(f.installer.currentPlan(), /更新状态与当前应用不匹配/);
 });

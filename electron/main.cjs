@@ -25,6 +25,7 @@ const { exportDocx } = require('../core/docx.cjs');
 const { Workspaces } = require('../core/workspaces.cjs');
 const { OperationGroup } = require('../core/operation-group.cjs');
 const documentOperations = new OperationGroup();
+const documentSearch = new (require('../core/document-search.cjs').DocumentSearch)();
 const { DocumentLibrary } = require('../core/library.cjs');
 const { createProjectServices } = require('./projects.cjs');
 let projects,
@@ -387,17 +388,21 @@ async function init() {
     ) {
       root = path.join(app.getPath('userData'), 'Welcome');
       await fs.mkdir(root, { recursive: true });
-      for (const file of [
-        '欢迎使用 Folio.md',
-        'Markdown 语法手册.md',
-        '公式、图与表.md',
-        'AGENTS.md',
-        'CLAUDE.md',
-      ]) {
+      const examples =
+        language === 'en'
+          ? ['en/Welcome to Folio.md', 'en/Markdown Guide.md', 'AGENTS.md', 'CLAUDE.md']
+          : [
+              '欢迎使用 Folio.md',
+              'Markdown 语法手册.md',
+              '公式、图与表.md',
+              'AGENTS.md',
+              'CLAUDE.md',
+            ];
+      for (const file of examples) {
         await fs
           .copyFile(
             path.join(app.getAppPath(), 'examples', file),
-            path.join(root, file),
+            path.join(root, path.basename(file)),
             require('node:fs').constants.COPYFILE_EXCL,
           )
           .catch((e) => {
@@ -647,7 +652,10 @@ async function init() {
       }
     return result;
   });
-  handle('search', (query, root) => workspaces.current(root).store.search(query));
+  handle('search', (query, root) => {
+    const store = workspaces.current(root).store;
+    return documentSearch.search(store.root, store.dataDir, query);
+  });
   handle('history', async (p) =>
     (await workspaces.forPath(p, { missing: true })).store.historyMetadata(p),
   );
@@ -737,24 +745,11 @@ async function init() {
     // Saving outside the current workspace is allowed only by the native save dialog.
     const sibling = new FileStore(app.getPath('userData'));
     await sibling.setRoot(path.dirname(res.filePath));
-    let previous = null;
-    try {
-      previous = await sibling.read(res.filePath);
-    } catch (e) {
-      if (e.code !== 'ENOENT') throw e;
-    }
-    const result = await sibling.save({
-      path: res.filePath,
-      content,
-      expectedHash: previous?.hash ?? null,
-      eol,
-      bom,
-    });
-    if (!result.ok) throw Error('目标文件在另存为期间被修改，请重试。');
-    const info = await watchRoot(
-      (await library.rootFor(result.file.path)) || path.dirname(result.file.path),
+    return require('../core/save-as.cjs').saveAsDocument(
+      sibling,
+      { path: res.filePath, content, eol, bom },
+      async (file) => watchRoot((await library.rootFor(file)) || path.dirname(file)),
     );
-    return { ...result.file, workspaceRoot: info.root };
   });
   handle('import-image', async ({ path: document, name, data }) => {
     const { store } = await workspaces.forPath(document);
@@ -1114,6 +1109,7 @@ require('./shutdown.cjs').installShutdown(
   app,
   async () => {
     const requests = documentOperations.close();
+    documentSearch.close();
     for (const timer of treeTimers.values()) clearTimeout(timer);
     for (const timer of documentTimers.values()) clearTimeout(timer);
     // Readers cancel independently; document replacements finish or roll back

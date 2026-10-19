@@ -17,6 +17,7 @@ const { verifyAgentPanel } = require('./desktop-agent-check.cjs');
 const { verifyContextMenu } = require('./desktop-context-check.cjs');
 const { verifyPreferences } = require('./desktop-preferences-check.cjs');
 const { verifyTabSession } = require('./desktop-tab-session-check.cjs');
+const { verifyDocumentLifecycle } = require('./desktop-lifecycle-check.cjs');
 const { contextItems } = require('../electron/context-menu.cjs');
 
 const temporary = path.resolve(process.argv[2]),
@@ -27,6 +28,7 @@ const scenario = process.argv[4] || 'normal',
 if (
   ![
     'normal',
+    'lifecycle',
     'home',
     'first-run',
     'table-edit',
@@ -38,6 +40,7 @@ if (
 )
   throw Error('Unsupported desktop verification scenario or language.');
 const editableScenario =
+  scenario === 'lifecycle' ||
   scenario === 'normal' ||
   scenario === 'table-edit' ||
   scenario === 'block-select' ||
@@ -345,13 +348,30 @@ async function run() {
     closes = 0,
     failDrafts = false;
   const drafts = new Map();
+  const researchFile = path.join(otherProject, 'Research.md');
+  let holdResearch = false,
+    researchStarted = false,
+    releaseResearch,
+    imageStarted = false,
+    releaseImage,
+    nativeRoot = workspace;
   const handlers = {
+    'import-image': async (input) => {
+      assert.equal(input.path, file);
+      imageStarted = true;
+      await new Promise((resolve) => {
+        releaseImage = resolve;
+      });
+      return 'assets/generated.png';
+    },
     close: () => {
       closes++;
     },
     'library-open': (p) => {
-      if (p !== file && p !== referenceFile) throw Error('Unexpected session document.');
-      return { root: workspace, tree };
+      if (![file, referenceFile, researchFile].includes(p))
+        throw Error('Unexpected session document.');
+      nativeRoot = p === researchFile ? otherProject : workspace;
+      return { root: nativeRoot, tree, initial: p };
     },
     'clipboard-write-content': require('../electron/clipboard.cjs').createRichClipboardWriter({
       write(value) {
@@ -492,7 +512,20 @@ async function run() {
       initial: bootstrapInitial,
       platform: process.platform,
     }),
-    read: (p) => {
+    read: async (p) => {
+      if (p === researchFile) {
+        researchStarted = true;
+        if (holdResearch)
+          await new Promise((resolve) => {
+            releaseResearch = resolve;
+          });
+        return {
+          ...snapshot,
+          path: p,
+          workspaceRoot: otherProject,
+          content: '# Other generated project\n',
+        };
+      }
       if (p === referenceFile)
         return {
           ...snapshot,
@@ -540,16 +573,18 @@ async function run() {
     directory: () => ({ nodes: tree, limited: false }),
     'quick-open': () => [{ path: file, name: 'Startup.md' }],
     'draft-get': (p) => {
-      if (p !== file && p !== referenceFile) throw Error('Unexpected draft path.');
+      if (![file, referenceFile, researchFile].includes(p)) throw Error('Unexpected draft path.');
       return drafts.get(p) || null;
     },
-    ...(scenario === 'table-edit' ||
+    ...(scenario === 'lifecycle' ||
+    scenario === 'table-edit' ||
     scenario === 'agent' ||
     scenario === 'home' ||
     scenario === 'normal'
       ? {
           'draft-put': (p, draft) => {
-            if (p !== file && p !== referenceFile) throw Error('Unexpected draft path.');
+            if (![file, referenceFile, researchFile].includes(p))
+              throw Error('Unexpected draft path.');
             if (failDrafts) throw Error('Generated draft persistence failure.');
             if (draft) drafts.set(p, draft);
             else drafts.delete(p);
@@ -565,8 +600,9 @@ async function run() {
         }
       : {}),
     'activate-workspace': (p) => {
-      if (p !== workspace) throw Error('Unexpected workspace.');
-      return { root: workspace, tree };
+      if (![workspace, otherProject].includes(p)) throw Error('Unexpected workspace.');
+      nativeRoot = p;
+      return { root: p, tree };
     },
     tree: () => tree,
     dirty: () => {},
@@ -688,7 +724,7 @@ async function run() {
       };
       const maths=Array.from(document.querySelectorAll('[data-math-source]'));
       const formulaReady=maths.length===3&&maths.every(node=>node.dataset.mathReady==='true'&&!!node.querySelector('svg path'))&&maths.some(node=>node.dataset.mathDisplay==='false'&&node.dataset.mathSource===${JSON.stringify(String.raw`\eta`)})&&maths.some(node=>node.dataset.mathDisplay==='true'&&node.dataset.mathSource?.includes(${JSON.stringify(String.raw`\sum_i`)}))&&getComputedStyle(document.querySelector('.formula-inline.math-preview')).display==='block';
-      const checks=(scenario==='normal'||scenario==='table-edit'||scenario==='block-select'||scenario==='formula-preview'||scenario==='agent')?{
+      const checks=(scenario==='lifecycle'||scenario==='normal'||scenario==='table-edit'||scenario==='block-select'||scenario==='formula-preview'||scenario==='agent')?{
         ...common,homeHidden:!home,onboardingHidden:!firstRun,
         workspaceEditable:document.querySelector('.workspace')?.inert===false,
         sortButton:!!document.querySelector('button[aria-label="'+(english?'Sort files':'文件排序')+'"]'),
@@ -746,6 +782,29 @@ async function run() {
           "!document.querySelector('.document-library') && !document.querySelector('.project-home') && document.querySelector('.workspace')?.inert === false",
         );
       }
+      const lifecycle =
+        scenario === 'lifecycle'
+          ? await verifyDocumentLifecycle(window, {
+              file,
+              referenceFile,
+              researchFile,
+              language,
+              holdResearch: () => {
+                holdResearch = true;
+              },
+              researchStarted: () => researchStarted,
+              releaseResearch: () => {
+                holdResearch = false;
+                releaseResearch();
+              },
+              nativeRestored: () => nativeRoot === workspace,
+              imageStarted: () => imageStarted,
+              releaseImage: () => releaseImage(),
+              contextAction: (value) => {
+                contextAction = value;
+              },
+            })
+          : null;
       const tableEditing =
         scenario === 'table-edit'
           ? await verifyTableEditor(
@@ -843,6 +902,7 @@ async function run() {
       clearTimeout(timeout);
       return finish(true, {
         observed,
+        ...(lifecycle ? { lifecycle } : {}),
         ...(tableEditing ? { tableEditing } : { fixtureUnchanged: true }),
         ...(blockSelection ? { blockSelection } : {}),
         ...(agentPanel ? { agentPanel } : {}),

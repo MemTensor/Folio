@@ -49,7 +49,14 @@ class FileStore {
     if (stat.size > MAX_BYTES) throw Error('文件超过 16 MB，请使用专门的大文件编辑器。');
     const bytes = await fs.readFile(target);
     if (bytes.length > MAX_BYTES) throw Error('文件在读取时增长到 16 MB 以上。');
-    const raw = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    let raw;
+    try {
+      raw = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    } catch {
+      throw Object.assign(Error('文件不是有效的 UTF-8 文本，请转换编码后重新打开。'), {
+        code: 'ENCODING',
+      });
+    }
     if (raw.includes('\0')) throw Error('不支持二进制文件。');
     const bom = raw.startsWith('\uFEFF');
     return {

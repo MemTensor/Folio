@@ -1,4 +1,25 @@
 module.exports = {
+  '云端发布记录已达到上限，请先处理待确认或旧的发布记录。':
+    'Cloud publication history has reached its limit. Resolve pending or old publication records first.',
+  '文档在关闭期间发生变化，标签已保留。':
+    'The document changed while closing. Its tab was kept open.',
+  '文档已变化，图片未插入。请在目标文档中重试。':
+    'The document changed, so the images were not inserted. Try again in the intended document.',
+  '文件已保存，但无法将目标文件夹作为项目打开。':
+    'The file was saved, but its folder could not be opened as a project.',
+  '此模型支持图片输入，可按需查看文档渲染':
+    'This model supports image input and can request a rendered document preview',
+  '上次更新尚未完成启动确认，旧版本备份仍保留。请正常退出并重新打开应用。':
+    'The previous update has not confirmed startup. The previous version is backed up. Quit normally and reopen the app.',
+  '文件不是有效的 UTF-8 文本，请转换编码后重新打开。':
+    'This file is not valid UTF-8 text. Convert its encoding and open it again.',
+  '文档身份无效，请重新打开项目。': 'The document identity is invalid. Reopen the project.',
+  '无法读取云服务凭据，请检查凭据文件或重新配置。':
+    'Cloud credentials could not be read. Check the credential file or configure the connection again.',
+  '上一次搜索还在结束，请稍后重试。': 'The previous search is still stopping. Try again shortly.',
+  '搜索耗时较长，已停止。请缩小项目范围后重试。':
+    'The search took too long and was stopped. Try a smaller project.',
+  '搜索暂不可用，请重试。': 'Search is temporarily unavailable. Try again.',
   '图片复制超时，请稍后重试。': 'Copying images timed out. Try again shortly.',
   '文档已变化，本次操作尚未应用，请重新审阅。':
     'The document changed, so this action was not applied. Review it again.',

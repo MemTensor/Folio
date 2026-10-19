@@ -168,7 +168,10 @@ async function stdin() {
 }
 const readInput = async (name) => (name === '-' ? stdin() : decode(await fs.readFile(name)));
 async function appBundle() {
-  const output = packageInfo.build?.directories?.output || 'release';
+  const output = require('../core/build-output.cjs').buildOutput(
+    path.resolve(__dirname, '..'),
+    packageInfo,
+  );
   const candidates = process.env.FOLIO_APP_BUNDLE
     ? [process.env.FOLIO_APP_BUNDLE]
     : [

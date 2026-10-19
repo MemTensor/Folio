@@ -28,14 +28,20 @@ class AgentTasks {
     if (!t) throw new CloudError('当前项目中没有这个任务。', 'USAGE');
     return t;
   }
-  async maintain(kb) {
+  async maintain(kb, connectionCloud = this.cloud) {
+    const cloud = await connectionCloud.scopedConnection();
+    const connection = await cloud.config();
     const result = { refreshed: 0, retired: 0, deferred: 0 };
     const entries = (await this.knowledge.publications()).filter(
-      (p) => p.knowledgebaseId === kb && p.mode === 'navigation' && p.baseURL,
+      (p) =>
+        p.baseURL === connection.baseURL &&
+        p.knowledgebaseId === kb &&
+        p.mode === 'navigation' &&
+        p.baseURL,
     );
     for (const p of entries.filter((p) => p.state === 'submitted' && p.fileIds.length).slice(0, 2))
       try {
-        await refreshPublication(this.knowledge, this.cloud, p.id);
+        await refreshPublication(this.knowledge, cloud, p.id);
         result.refreshed++;
       } catch {
         result.deferred++;
@@ -46,6 +52,7 @@ class AgentTasks {
     const stale = [];
     for (const p of latest.filter(
       (p) =>
+        p.baseURL === connection.baseURL &&
         p.knowledgebaseId === kb &&
         p.mode === 'navigation' &&
         ['ready', 'submitted'].includes(p.state) &&
@@ -53,6 +60,9 @@ class AgentTasks {
     )) {
       const newer = latest.find(
         (n) =>
+          n.baseURL === p.baseURL &&
+          n.fileIds?.length &&
+          !n.fileIds.some((id) => p.fileIds.includes(id)) &&
           n.knowledgebaseId === kb &&
           n.documentId === p.documentId &&
           n.mode === 'navigation' &&
@@ -66,8 +76,8 @@ class AgentTasks {
     }
     for (const old of stale.slice(0, 2)) {
       try {
-        if (old.baseURL !== (await this.cloud.config()).baseURL) continue;
-        await this.cloud.removeDocuments(old.fileIds);
+        if (old.baseURL !== connection.baseURL) continue;
+        await cloud.removeDocuments(old.fileIds);
         await this.knowledge.mutate((db) => {
           db.publications[old.id] = { ...old, state: 'retired', retiredAt: Date.now() };
         });
@@ -81,13 +91,15 @@ class AgentTasks {
   async begin(query) {
     if (typeof query !== 'string' || !query.trim())
       throw new CloudError('task begin 需要简短的任务描述。', 'USAGE');
-    const binding = await this.cloud.project(this.root),
+    const cloud = await this.cloud.scopedConnection();
+    const binding = await cloud.project(this.root),
       task = {
         id: crypto.randomUUID(),
         workspace: this.root,
         startedAt: Date.now(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         query: query.slice(0, 1000),
+        baseURL: (await cloud.config()).baseURL,
         knowledgebaseId: binding.knowledgebaseId,
         state: 'active',
       };
@@ -100,13 +112,8 @@ class AgentTasks {
     };
     if (binding.enabled)
       try {
-        memory.maintenance = await this.maintain(binding.knowledgebaseId);
-        const found = await searchKnowledge(
-          this.knowledge,
-          this.cloud,
-          query,
-          binding.knowledgebaseId,
-        );
+        memory.maintenance = await this.maintain(binding.knowledgebaseId, cloud);
+        const found = await searchKnowledge(this.knowledge, cloud, query, binding.knowledgebaseId);
         memory.items = found.items.filter((i) => i.source);
         memory.unassociatedCount = found.items.length - memory.items.length;
       } catch (e) {
@@ -116,7 +123,12 @@ class AgentTasks {
     return {
       task,
       memory,
-      pendingDocuments: binding.enabled ? await this.knowledge.pending() : [],
+      pendingDocuments: binding.enabled
+        ? await this.knowledge.pending(8, {
+            baseURL: task.baseURL,
+            knowledgebaseId: binding.knowledgebaseId,
+          })
+        : [],
       notice:
         '默认只使用当前项目。索引仅帮助定位，具体结论请读取当前原文；历史问题显式读取旧 revision。',
     };
@@ -130,25 +142,21 @@ class AgentTasks {
     for (const d of documents)
       if (typeof d.path !== 'string' || !d.expectedRevision)
         throw new CloudError('每份文档需要 path 和读取到的 expectedRevision。', 'USAGE');
-    const binding = await this.cloud.project(this.root);
+    const cloud = await this.cloud.scopedConnection();
+    const binding = await cloud.project(this.root);
+    const sameConnection = task.baseURL === (await cloud.config()).baseURL;
     const results = [];
-    if (binding.enabled && binding.knowledgebaseId === task.knowledgebaseId) {
+    if (binding.enabled && sameConnection && binding.knowledgebaseId === task.knowledgebaseId) {
       for (const doc of documents) {
         if (typeof doc.path !== 'string' || !doc.expectedRevision)
           throw new CloudError('每份文档需要 path 和读取到的 expectedRevision。', 'USAGE');
         try {
-          const item = await publish(
-            this.knowledge,
-            this.cloud,
-            doc.path,
-            binding.knowledgebaseId,
-            {
-              expectedRevision: doc.expectedRevision,
-              summary: doc.summary,
-              whenToRead: doc.whenToRead,
-              mode: 'navigation',
-            },
-          );
+          const item = await publish(this.knowledge, cloud, doc.path, binding.knowledgebaseId, {
+            expectedRevision: doc.expectedRevision,
+            summary: doc.summary,
+            whenToRead: doc.whenToRead,
+            mode: 'navigation',
+          });
           results.push({ path: item.path, publicationId: item.id, state: item.state });
         } catch (e) {
           results.push({ path: doc.path, state: 'deferred', reason: e.code || 'ERROR' });
@@ -156,8 +164,8 @@ class AgentTasks {
       }
     }
     let maintenance = null;
-    if (binding.enabled && binding.knowledgebaseId === task.knowledgebaseId)
-      maintenance = await this.maintain(binding.knowledgebaseId);
+    if (binding.enabled && sameConnection && binding.knowledgebaseId === task.knowledgebaseId)
+      maintenance = await this.maintain(binding.knowledgebaseId, cloud);
     const finished = {
       ...task,
       state: 'finished',
@@ -166,7 +174,7 @@ class AgentTasks {
       maintenance,
       memoryStatus: !binding.enabled
         ? 'disabled'
-        : binding.knowledgebaseId !== task.knowledgebaseId
+        : !sameConnection || binding.knowledgebaseId !== task.knowledgebaseId
           ? 'binding-changed'
           : 'processed',
     };

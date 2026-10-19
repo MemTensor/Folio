@@ -23,6 +23,7 @@ export function AgentSettings({
   const [baseURL, setBaseURL] = useState('https://api.openai.com/v1');
   const [model, setModel] = useState('');
   const [hintModel, setHintModel] = useState('');
+  const [imageInput, setImageInput] = useState(false);
   const [key, setKey] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -79,6 +80,7 @@ export function AgentSettings({
         setBaseURL(value.baseURL);
         setModel(value.model);
         setHintModel(value.hintModel);
+        setImageInput(value.imageInput);
       })
       .catch((e) => {
         if (current.current) setError(t(errorMessage(e)));
@@ -103,6 +105,7 @@ export function AgentSettings({
     configuration.baseURL === baseURL.trim().replace(/\/+$/, '') &&
     configuration.model === model.trim() &&
     configuration.hintModel === hintModel.trim() &&
+    configuration.imageInput === imageInput &&
     !key;
   useEffect(() => {
     if (!configuration || focused.current || !target) return;
@@ -295,6 +298,15 @@ export function AgentSettings({
               ))}
             </datalist>
           </label>
+          <label className="agent-image-input">
+            <input
+              type="checkbox"
+              checked={imageInput}
+              disabled={busy}
+              onChange={(e) => setImageInput(e.target.checked)}
+            />
+            {t('此模型支持图片输入，可按需查看文档渲染')}
+          </label>
           <details className="agent-hint-options">
             <summary>{t('文档建议模型')}</summary>
             <label>
@@ -326,6 +338,7 @@ export function AgentSettings({
                     baseURL,
                     model,
                     hintModel,
+                    imageInput,
                     ...(key.trim() ? { apiKey: key.trim() } : {}),
                   });
                   setKey('');
@@ -333,6 +346,7 @@ export function AgentSettings({
                   setBaseURL(value.baseURL);
                   setModel(value.model);
                   setHintModel(value.hintModel);
+                  setImageInput(value.imageInput);
                   setMessage(t('API 设置已保存。'));
                   updateConnection(await bridge.agentStatus());
                 })

@@ -261,12 +261,7 @@ class MacUpdateInstaller {
       'Contents/Resources/cli',
     ])
       await plainDirectory(path.join(bundle, directory));
-    for (const file of [
-      'Contents/Info.plist',
-      'Contents/MacOS/Folio',
-      'Contents/Resources/app.asar',
-      'Contents/Resources/cli/folio.cjs',
-    ]) {
+    for (const file of require('./bundle-contract.cjs').BUNDLE_FILES) {
       const stat = await fs.lstat(path.join(bundle, file));
       if (!stat.isFile() || stat.size === 0) throw fail('安装包缺少必要文件。');
     }
@@ -338,6 +333,9 @@ class MacUpdateInstaller {
       const targetIdentity = await this.inspectBundle(targetPath, this.currentVersion);
       await fs.mkdir(this.directory, { recursive: true, mode: 0o700 });
       await plainDirectory(this.directory);
+      await require('./update-staging.cjs')
+        .cleanupPreparations(this.directory, targetPath)
+        .catch(() => {});
       const id = crypto.randomUUID(),
         nonce = crypto.randomBytes(32).toString('hex');
       transactionDir = await fs.mkdtemp(path.join(this.directory, 'install-'));
@@ -345,6 +343,15 @@ class MacUpdateInstaller {
       stagePath = path.join(parent, '.folio-update-' + id + '.app');
       await fs.mkdir(stagePath, { mode: 0o700 });
       createdStageIdentity = identity(await fs.lstat(stagePath, { bigint: true }));
+      await writeJSON(path.join(transactionDir, 'preparation.json'), {
+        id,
+        pid: process.pid,
+        targetPath,
+        stagePath,
+        transactionDir,
+        stageIdentity: createdStageIdentity,
+        transactionIdentity,
+      });
       handle = await fs.open(path.resolve(archivePath), constants.O_RDONLY | constants.O_NOFOLLOW);
       const stat = await handle.stat();
       if (!stat.isFile() || stat.size !== size) throw fail('安装包大小不匹配。');
@@ -609,6 +616,7 @@ class MacUpdateInstaller {
     const plan = await readJSON(path.join(current.transactionDir, 'plan.json'));
     if (
       !plan ||
+      plan.transactionDir !== current.transactionDir ||
       plan.id !== current.id ||
       plan.nonce !== current.nonce ||
       plan.version !== current.version ||

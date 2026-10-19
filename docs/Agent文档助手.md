@@ -20,6 +20,8 @@
 
 选择“兼容 API”，填写服务的 API 基础地址、API Key 和模型名称，再点击“保存并返回文档”或“保存并返回设置”。基础地址通常包含 `/v1`，例如 `https://api.openai.com/v1`；本机服务支持 HTTP，未启用鉴权时 Key 可以留空。
 
+如果当前模型支持图片输入，可勾选“此模型支持图片输入，可按需查看文档渲染”。兼容 API 默认仅发送文本；启用后，模型仍需主动调用预览工具才会收到当前可见区域。
+
 API Key 通过系统安全存储加密，界面只显示是否已保存。留空可保留同一服务的现有 Key；更换远程服务地址时需要填写对应的 Key。保存后可重新进入 Agent 设置，点击“检测服务”获取模型列表；不提供模型列表的服务也可手动填写模型名称。
 
 本版支持 [Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 的文本请求和流式回复。模型请求使用所配置服务的 API 额度，独立于 ChatGPT 订阅。API 接入可以在没有安装 Codex CLI 的情况下使用，也保留相同的选区范围、修改审阅和撤销保护。

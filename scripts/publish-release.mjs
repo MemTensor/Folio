@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import buildPaths from '../core/build-output.cjs';
 import fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
@@ -90,11 +92,9 @@ async function inspectZip(zip, version, commit, command, cwd) {
     ),
     'ZIP 必须只包含 Folio.app 下的有效相对路径。',
   );
-  for (const name of [
-    'Folio.app/Contents/Info.plist',
-    'Folio.app/Contents/MacOS/Folio',
-    'Folio.app/Contents/Resources/app.asar',
-  ])
+  for (const name of require('../core/bundle-contract.cjs').BUNDLE_FILES.map(
+    (file) => 'Folio.app/' + file,
+  ))
     check(listing.includes(name), '安装包缺少：' + name);
   const plist = (
     await command('/usr/bin/unzip', ['-p', zip, 'Folio.app/Contents/Info.plist'], {

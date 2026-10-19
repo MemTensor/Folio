@@ -34,12 +34,15 @@ class AgentSettings {
       baseURL: saved.api?.baseURL || 'https://api.openai.com/v1',
       model: saved.api?.model || '',
       hintModel: saved.api?.hintModel || '',
+      imageInput: saved.api?.imageInput === true,
       hasKey: !!saved.api?.credential,
       configured: !!saved.api?.model,
     };
   }
   async configure(input) {
     if (!input || !['chatgpt', 'api'].includes(input.provider)) throw fail('Agent 接入设置无效。');
+    if (input.imageInput !== undefined && typeof input.imageInput !== 'boolean')
+      throw fail('Agent 接入设置无效。');
     const saved = await this.data();
     let api = saved.api || {};
     if (input.provider === 'api') {
@@ -75,6 +78,8 @@ class AgentSettings {
         baseURL,
         model: input.model.trim(),
         hintModel: hintModel.trim(),
+        imageInput:
+          input.imageInput === undefined ? api.imageInput === true : input.imageInput === true,
         ...(credential ? { credential } : {}),
       };
     }
@@ -93,7 +98,12 @@ class AgentSettings {
         throw fail('API Key 无法读取，请在设置中重新填写。');
       }
     }
-    return { baseURL: apiURL(saved.api.baseURL), model: saved.api.model, apiKey };
+    return {
+      baseURL: apiURL(saved.api.baseURL),
+      model: saved.api.model,
+      imageInput: saved.api.imageInput === true,
+      apiKey,
+    };
   }
 }
 module.exports = { AgentSettings, apiURL };

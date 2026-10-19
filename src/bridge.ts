@@ -98,6 +98,7 @@ const demo: Bridge = {
     baseURL: 'https://api.openai.com/v1',
     model: '',
     hintModel: '',
+    imageInput: false,
     hasKey: false,
     configured: false,
   }),

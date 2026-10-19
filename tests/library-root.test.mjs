@@ -125,6 +125,7 @@ function productionBootstrap(context) {
       setImmediate,
       writeJSON,
       pendingFile: null,
+      language: 'zh-CN',
       drainDeferredOpens: () => {},
       handle(name, fn) {
         assert.equal(name, 'bootstrap');
@@ -137,68 +138,79 @@ function productionBootstrap(context) {
   return bootstrap;
 }
 
-for (const layout of ['default', 'custom-library', 'custom-outside']) {
-  test(`production bootstrap opens and reopens Welcome using ${layout} dataDir`, async (t) => {
-    const { temporary, dataDir, library } = await fixture(t, layout);
-    const appPath = path.join(temporary, 'generated-app');
-    const names = [
-      '欢迎使用 Folio.md',
-      'Markdown 语法手册.md',
-      '公式、图与表.md',
-      'AGENTS.md',
-      'CLAUDE.md',
-    ];
-    await fs.mkdir(path.join(appPath, 'examples/assets'), { recursive: true });
-    for (const name of names)
-      await fs.writeFile(path.join(appPath, 'examples', name), '# Generated fixture\n');
-    await fs.writeFile(path.join(appPath, 'examples/assets/example-curve.png'), 'fixture asset');
+for (const language of ['zh-CN', 'en'])
+  for (const layout of ['default', 'custom-library', 'custom-outside']) {
+    test(`production bootstrap opens and reopens Welcome using ${layout} dataDir in ${language}`, async (t) => {
+      const { temporary, dataDir, library } = await fixture(t, layout);
+      const appPath = path.join(temporary, 'generated-app');
+      const names =
+        language === 'en'
+          ? ['en/Welcome to Folio.md', 'en/Markdown Guide.md', 'AGENTS.md', 'CLAUDE.md']
+          : [
+              '欢迎使用 Folio.md',
+              'Markdown 语法手册.md',
+              '公式、图与表.md',
+              'AGENTS.md',
+              'CLAUDE.md',
+            ];
+      await fs.mkdir(path.join(appPath, 'examples/assets'), { recursive: true });
+      await fs.mkdir(path.join(appPath, 'examples/en'), { recursive: true });
+      for (const name of names)
+        await fs.writeFile(path.join(appPath, 'examples', name), '# Generated fixture\n');
+      await fs.writeFile(path.join(appPath, 'examples/assets/example-curve.png'), 'fixture asset');
 
-    const browser = new WorkspaceBrowser();
-    const workspaceSession = new WorkspaceSession(browser);
-    t.after(() => workspaceSession.close());
-    const workspaces = new Workspaces(dataDir);
-    const configuration = {};
-    const bootstrap = productionBootstrap({
-      library,
-      workspaceSession,
-      workspaces,
-      configuration,
-      app: {
-        getPath(name) {
-          assert.equal(name, 'userData');
-          return dataDir;
+      const browser = new WorkspaceBrowser();
+      const workspaceSession = new WorkspaceSession(browser);
+      t.after(() => workspaceSession.close());
+      const workspaces = new Workspaces(dataDir);
+      const configuration = {};
+      const bootstrap = productionBootstrap({
+        language,
+        library,
+        workspaceSession,
+        workspaces,
+        configuration,
+        app: {
+          getPath(name) {
+            assert.equal(name, 'userData');
+            return dataDir;
+          },
+          getAppPath: () => appPath,
         },
-        getAppPath: () => appPath,
-      },
-    });
-    const result = await bootstrap();
-    const welcome = path.join(dataDir, 'Welcome');
-    assert.equal(result.root, welcome);
-    assert.equal(configuration.root, welcome);
-    assert.deepEqual(
-      result.tree
-        .filter((node) => node.kind === 'file')
-        .map((node) => node.name)
-        .sort(),
-      names.sort(),
-    );
-    assert.equal(JSON.parse(await fs.readFile(path.join(dataDir, 'config.json'))).root, welcome);
-    assert.equal((await library.state()).projects[0].root, welcome);
-    assert.equal((await library.snapshot()).total, names.length);
-    const note = path.join(welcome, names[0]);
-    assert.equal((await library.locate(note)).root, welcome);
-    assert.equal((await workspaces.current().store.read(note)).content, '# Generated fixture\n');
-    assert.equal(
-      (await library.index.request({ operation: 'filenames', root: welcome, query: names[0] }))
-        .documents.length,
-      1,
-    );
+      });
+      const result = await bootstrap();
+      const welcome = path.join(dataDir, 'Welcome');
+      assert.equal(result.root, welcome);
+      assert.equal(configuration.root, welcome);
+      assert.deepEqual(
+        result.tree
+          .filter((node) => node.kind === 'file')
+          .map((node) => node.name)
+          .sort(),
+        names.map((name) => path.basename(name)).sort(),
+      );
+      assert.equal(JSON.parse(await fs.readFile(path.join(dataDir, 'config.json'))).root, welcome);
+      assert.equal((await library.state()).projects[0].root, welcome);
+      assert.equal((await library.snapshot()).total, names.length);
+      const note = path.join(welcome, path.basename(names[0]));
+      assert.equal((await library.locate(note)).root, welcome);
+      assert.equal((await workspaces.current().store.read(note)).content, '# Generated fixture\n');
+      assert.equal(
+        (
+          await library.index.request({
+            operation: 'filenames',
+            root: welcome,
+            query: path.basename(names[0]),
+          })
+        ).documents.length,
+        1,
+      );
 
-    await fs.writeFile(note, '# User changes to the generated fixture\n');
-    assert.equal((await bootstrap()).root, welcome);
-    configuration.root = path.join(temporary, 'missing-project');
-    assert.equal((await bootstrap()).root, welcome);
-    assert.equal(await fs.readFile(note, 'utf8'), '# User changes to the generated fixture\n');
-    assert.equal((await library.state()).projects.length, 1);
-  });
-}
+      await fs.writeFile(note, '# User changes to the generated fixture\n');
+      assert.equal((await bootstrap()).root, welcome);
+      configuration.root = path.join(temporary, 'missing-project');
+      assert.equal((await bootstrap()).root, welcome);
+      assert.equal(await fs.readFile(note, 'utf8'), '# User changes to the generated fixture\n');
+      assert.equal((await library.state()).projects.length, 1);
+    });
+  }

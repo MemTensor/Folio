@@ -133,6 +133,7 @@ class CompatibleClient extends EventEmitter {
           {
             model: this.config.model,
             displayName: this.config.model,
+            inputModalities: this.config.imageInput ? ['text', 'image'] : ['text'],
             isDefault: true,
             supportedReasoningEfforts: [
               'none',

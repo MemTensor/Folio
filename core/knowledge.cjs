@@ -1,3 +1,4 @@
+const { UUID } = require('./identifiers.cjs');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const crypto = require('node:crypto');
@@ -15,6 +16,7 @@ const validKnowledge = (db) =>
     (doc) =>
       object(doc) &&
       typeof doc.id === 'string' &&
+      UUID.test(doc.id) &&
       typeof doc.path === 'string' &&
       Array.isArray(doc.events),
   );
@@ -90,6 +92,7 @@ class KnowledgeStore {
     return withLock(this.dataDir, 'knowledge:' + file, async () => {
       const db = await this.state();
       const result = await fn(db);
+      require('./publication-retention.cjs').retainPublications(db.publications);
       const migration =
         db.schemaVersion !== 2 ||
         Object.values(db.documents).some((doc) => Object.hasOwn(doc, 'lastContent'));
@@ -201,9 +204,13 @@ class KnowledgeStore {
       sections: sections(file.content).map(({ content, ...h }) => h),
     };
   }
-  async pending(limit = 8) {
+  async pending(limit = 8, { baseURL, knowledgebaseId } = {}) {
     const db = await this.state(),
-      pubs = Object.values(db.publications);
+      pubs = Object.values(db.publications).filter(
+        (p) =>
+          (!baseURL || p.baseURL === baseURL) &&
+          (!knowledgebaseId || p.knowledgebaseId === knowledgebaseId),
+      );
     return Object.values(db.documents)
       .filter(
         (d) =>

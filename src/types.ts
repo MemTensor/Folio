@@ -237,6 +237,7 @@ export interface Bridge {
     baseURL: string;
     model: string;
     hintModel: string;
+    imageInput: boolean;
     hasKey: boolean;
     configured: boolean;
   }>;
@@ -245,6 +246,7 @@ export interface Bridge {
     baseURL?: string;
     model?: string;
     hintModel?: string;
+    imageInput?: boolean;
     apiKey?: string;
   }): Promise<any>;
   agentTestAPI(): Promise<{ models: string[] }>;
@@ -393,7 +395,7 @@ export interface Bridge {
   trash(path: string): Promise<boolean>;
   reveal(path: string): Promise<void>;
   openLink(href: string, path: string): Promise<{ file: FileSnapshot; anchor?: string } | void>;
-  saveAs(file: FileSnapshot): Promise<FileSnapshot | null>;
+  saveAs(file: FileSnapshot): Promise<(FileSnapshot & { openWarning?: boolean }) | null>;
   importImage(args: { path: string; name: string; data: string }): Promise<string>;
   export(args: {
     kind: 'html' | 'pdf' | 'docx';

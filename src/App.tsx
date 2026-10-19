@@ -1,3 +1,5 @@
+import { scheduleBounded, cancelBounded } from './bounded-debounce.mjs';
+import { useDocumentAnalysis } from './use-document-analysis';
 import { ProjectHome, FirstRun } from './ProjectHome';
 import { t, getLocale, setLocale, subscribeLocale, localeTag, errorMessage } from './i18n';
 import './projects.css';
@@ -268,7 +270,7 @@ function TableEditor({
   onClose: () => void;
   error?: string;
 }) {
-  const initial = parseTable(raw);
+  const initial = parseTable(raw, getLocale() === 'en' ? ['Item', 'Description'] : undefined);
   const [cells, setCells] = useState<string[][]>(initial.cells),
     [align, setAlign] = useState<string[]>(initial.align);
   const update = (r: number, c: number, v: string) =>
@@ -406,6 +408,12 @@ export default function App() {
   // The workspace the project home was opened from. Cancelling an open returns
   // here, which `rootRef` can no longer answer once `workspace()` has run.
   const homeReturnRoot = useRef('');
+  const homeReturn = useRef<{
+    root: string;
+    active: string;
+    tree: TreeNode[];
+    limited: boolean;
+  } | null>(null);
   const openedFromSystem = useRef(false);
   const projectStarted = useRef(false);
   const firstRun = !!projectData && !projectData.preferences.onboarded;
@@ -535,9 +543,12 @@ export default function App() {
     pending = doc && doc.pending !== undefined;
   const preview = useMemo(() => previewBudget(doc?.content || ''), [doc?.content]);
   const effectiveMode = preview.allowed ? mode : 'source';
+  const analyzed = useDocumentAnalysis(active, doc?.content || '');
+  const analysisText = effectiveMode === 'read' ? doc?.content || '' : analyzed;
+  const analysisPreview = useMemo(() => previewBudget(analysisText), [analysisText]);
   const outline = useMemo(
-    () => (preview.allowed ? headings(doc?.content || '') : []),
-    [doc?.content, preview.allowed],
+    () => (preview.allowed && analysisPreview.allowed ? headings(analysisText) : []),
+    [analysisText, preview.allowed, analysisPreview.allowed],
   );
   const allFiles = useMemo(() => flatten(tree), [tree]);
   const [fileSort, setFileSort] = useState<FileSortMode>(() => loadFileSort(localStorage));
@@ -644,10 +655,11 @@ export default function App() {
   const flushAll = async () => {
     await Promise.all(Object.keys(docsRef.current).map(flushDraft));
   };
-  async function openFile(p: string, line?: number, activate = true) {
+  async function openFile(p: string, line?: number, activate = true, isCurrent = () => true) {
     const ticket = activate ? ++navigation.current : navigation.current;
     if (!docsRef.current[p]) {
       const [file, draft] = await Promise.all([bridge.read(p), bridge.getDraft(p)]);
+      if (!isCurrent()) return;
       const fresh: Doc = {
         root: file.workspaceRoot || rootRef.current,
         ...restoredDocument(file, draft),
@@ -663,11 +675,12 @@ export default function App() {
         replaceDocuments(next);
       }
     }
-    if (!activate || ticket !== navigation.current) return;
+    if (!activate || ticket !== navigation.current || !isCurrent()) return;
     select(p);
     if (line) requestAnimationFrame(() => requestAnimationFrame(() => editor.current?.jump(line)));
   }
-  async function workspace(info: Workspace) {
+  async function workspace(info: Workspace, isCurrent = () => true) {
+    if (!isCurrent()) return;
     rootRef.current = info.root;
     setRoot(info.root);
     setTree(info.tree);
@@ -679,20 +692,24 @@ export default function App() {
     const files = flatten(info.tree);
     const last = localStorage.getItem('folio-last:' + info.root);
     if (info.initial) {
-      await openFile(info.initial);
+      await openFile(info.initial, undefined, true, isCurrent);
       return;
     }
     if (last) {
       try {
-        await openFile(last);
+        await openFile(last, undefined, true, isCurrent);
         return;
       } catch {
         // A shallow folder listing intentionally does not contain nested files.
         // Try the saved document directly; a missing document is safe to skip.
       }
     }
-    const first = files.find((file) => file.name === '欢迎使用 Folio.md')?.path || files[0]?.path;
-    if (first) await openFile(first);
+    const first =
+      files.find(
+        (file) =>
+          file.name === (getLocale() === 'en' ? 'Welcome to Folio.md' : '欢迎使用 Folio.md'),
+      )?.path || files[0]?.path;
+    if (first) await openFile(first, undefined, true, isCurrent);
   }
   async function choose(kind: 'file' | 'folder') {
     await flushAll();
@@ -744,19 +761,13 @@ export default function App() {
   }
   function schedule(p: string) {
     if (updatePreparation.current || closing.current) return;
-    clearTimeout(timers.current.get(p));
-    clearTimeout(draftTimers.current.get(p));
-    draftTimers.current.set(
-      p,
-      setTimeout(() => guarded(() => flushDraft(p), 'draft'), 350),
-    );
+    scheduleBounded(draftTimers.current, p, () => guarded(() => flushDraft(p), 'draft'), 350, 2000);
     const current = docsRef.current[p];
     if (current && canAutoSave(current, prefRef.current.autoSave))
-      timers.current.set(
-        p,
-        setTimeout(() => guarded(() => save(p, false)), 1500),
-      );
+      scheduleBounded(timers.current, p, () => guarded(() => save(p, false)), 1500, 10000);
+    else cancelBounded(timers.current, p);
   }
+
   function edit(text: string) {
     const p = activeRef.current;
     updateDoc(p, (d) => ({ ...d, content: text, error: undefined }));
@@ -1098,6 +1109,29 @@ export default function App() {
     };
   }, [loading]);
   useEffect(() => {
+    if (showHome)
+      homeReturn.current = {
+        root: rootRef.current,
+        active: activeRef.current,
+        tree,
+        limited: treeLimited,
+      };
+  }, [showHome]);
+  useEffect(() => {
+    const retain = () => {
+      if (!closing.current && !updatePreparation.current) guarded(flushAll, 'draft');
+    };
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') retain();
+    };
+    window.addEventListener('blur', retain);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('blur', retain);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, []);
+  useEffect(() => {
     document.documentElement.dataset.theme = prefs.theme;
     localStorage.setItem('folio-preferences', JSON.stringify(prefs));
   }, [prefs]);
@@ -1107,17 +1141,22 @@ export default function App() {
       localStorage.setItem('folio-last:' + (docsRef.current[active]?.root || root), active);
     }
   }, [active, root]);
+  const hasUnsavedWork =
+    !!table ||
+    Object.values(docs).some((d) => changed(d) || d.pending !== undefined || d.restorePending);
   useEffect(() => {
-    void bridge.dirty(
-      !!table ||
-        Object.values(docs).some((d) => changed(d) || d.pending !== undefined || d.restorePending),
-    );
-  }, [docs, loading, table]);
+    void bridge.dirty(hasUnsavedWork);
+  }, [hasUnsavedWork, loading]);
+  const openDocumentPaths = JSON.stringify(Object.keys(docs));
   useEffect(() => {
     if (!loading && !closing.current && !updatePreparation.current)
-      writeTabSession(localStorage, Object.keys(docs), active, prefs.restoreTabs !== 'never');
-  }, [docs, active, loading, prefs.restoreTabs]);
-  const openDocumentPaths = JSON.stringify(Object.keys(docs));
+      writeTabSession(
+        localStorage,
+        JSON.parse(openDocumentPaths),
+        active,
+        prefs.restoreTabs !== 'never',
+      );
+  }, [openDocumentPaths, active, loading, prefs.restoreTabs]);
   useEffect(() => {
     void bridge.watchDocuments(JSON.parse(openDocumentPaths)).catch(fail);
   }, [openDocumentPaths]);
@@ -1251,7 +1290,9 @@ export default function App() {
         );
         return;
       }
-      const h = outline.find((h) => h.id === decodeURIComponent(href.slice(1)));
+      const h = headings(docsRef.current[activeRef.current]?.content || '').find(
+        (h) => h.id === decodeURIComponent(href.slice(1)),
+      );
       if (h) jump(h.line);
       return;
     }
@@ -1272,7 +1313,16 @@ export default function App() {
   }
   async function addImages(files: File[]) {
     if (!doc || requireSourceInsertion()) return;
+    const target = activeRef.current,
+      view = editor.current?.view,
+      content = docsRef.current[target]?.content;
+    const stillCurrent = () =>
+      activeRef.current === target &&
+      editor.current?.view === view &&
+      docsRef.current[target]?.content === content;
+    const inserts: string[] = [];
     for (const f of files) {
+      if (!stillCurrent()) return;
       if (!f.type.startsWith('image/')) {
         notify(t('拖入图片可插入到文档；打开文档请使用 ⌘ O。'));
         continue;
@@ -1282,13 +1332,17 @@ export default function App() {
       for (let i = 0; i < bytes.length; i += 8192)
         binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
       const relative = await bridge.importImage({
-        path: doc.file.path,
+        path: target,
         name: f.name,
         data: btoa(binary),
       });
-      if (editor.current)
-        insertText(editor.current.view, `![${f.name.replace(/\.[^.]+$/, '')}](${relative})\n`);
+      inserts.push(`![${f.name.replace(/\.[^.]+$/, '')}](${relative})\n`);
     }
+    if (!stillCurrent() || !view) {
+      notify(t('文档已变化，图片未插入。请在目标文档中重试。'));
+      return;
+    }
+    insertText(view, inserts.join(''));
   }
   async function exportDoc(kind: 'html' | 'pdf' | 'docx') {
     if (!doc) return;
@@ -1711,8 +1765,12 @@ export default function App() {
       if (doc) {
         const result = await bridge.saveAs({ ...doc.file, content: doc.content });
         if (result) {
-          notify(t('已另存为：') + result.path);
-          await openFile(result.path);
+          if (result.openWarning)
+            notify(t('文件已保存，但无法将目标文件夹作为项目打开。') + ' ' + result.path);
+          else {
+            notify(t('已另存为：') + result.path);
+            await openFile(result.path);
+          }
         }
       }
     } else if (id === 'source') setMode((m) => (m === 'source' ? 'live' : 'source'));
@@ -1752,7 +1810,9 @@ export default function App() {
       await bridge.copyText(active);
       notify(t('已复制文件绝对路径。'));
     } else if (id === 'guide') {
-      const guide = allFiles.find((f) => f.name === 'Markdown 语法手册.md');
+      const guide = allFiles.find(
+        (f) => f.name === (getLocale() === 'en' ? 'Markdown Guide.md' : 'Markdown 语法手册.md'),
+      );
       if (guide) await openFile(guide.path);
       else notify(t('语法手册位于应用首次启动的示例文件夹中。'));
     } else if (id === 'close-request') {
@@ -1903,10 +1963,17 @@ export default function App() {
     () => (doc?.pending ? merge3(doc.file.content, doc.content, doc.pending.content) : null),
     [doc?.pending, doc?.content, doc?.file.content],
   );
-  const review = doc?.pending
-    ? { before: doc.file.content, after: doc.pending.content, time: Date.now() }
-    : doc?.review;
-  const diff = review ? reviewChanges(review.before, review.after) : [];
+  const review = useMemo(
+    () =>
+      doc?.pending
+        ? { before: doc.file.content, after: doc.pending.content, time: doc.pending.mtime || 0 }
+        : doc?.review,
+    [doc?.pending, doc?.file.content, doc?.review],
+  );
+  const diff = useMemo(
+    () => (panel === 'review' && review ? reviewChanges(review.before, review.after) : []),
+    [panel, review],
+  );
   async function resolvePending(content: string) {
     if (!doc?.pending) return;
     const path = active,
@@ -2059,13 +2126,18 @@ export default function App() {
     }
   }
   async function closeTab(p: string) {
+    const before = docsRef.current[p];
     await flushDraft(p);
-    clearTimeout(timers.current.get(p));
-    clearTimeout(draftTimers.current.get(p));
+    if (docsRef.current[p]?.content !== before?.content) {
+      notify(t('文档在关闭期间发生变化，标签已保留。'));
+      return;
+    }
+    cancelBounded(timers.current, p);
+    cancelBounded(draftTimers.current, p);
     const next = { ...docsRef.current };
     delete next[p];
     replaceDocuments(next);
-    if (active === p) select(Object.keys(next).at(-1) || '');
+    if (activeRef.current === p || !next[activeRef.current]) select(Object.keys(next).at(-1) || '');
   }
   async function revertHunk(index: number) {
     if (!doc?.review) return;
@@ -2094,12 +2166,12 @@ export default function App() {
   }
 
   const wordCount = useMemo(() => {
-    if (!preview.allowed) return null;
-    const text = doc?.content || '';
+    if (!preview.allowed || !analysisPreview.allowed) return null;
+    const text = analysisText;
     return (
       text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]|[\p{L}\p{N}]+/gu) || []
     ).length;
-  }, [doc?.content, preview.allowed]);
+  }, [analysisText, preview.allowed, analysisPreview.allowed]);
   const css = {
     '--editor-font-size': prefs.fontSize + 'px',
     '--editor-width': prefs.width + 'px',
@@ -2288,7 +2360,19 @@ export default function App() {
                   <div className="section-label">
                     {t('本文目录')} <span>{outline.length}</span>
                   </div>
-                  <OutlineItems cursor={cursor} headings={outline} jump={jump} />
+                  <OutlineItems
+                    cursor={cursor}
+                    headings={outline}
+                    jump={(line) => {
+                      const shown = outline.find((h) => h.line === line);
+                      const current = docsRef.current[activeRef.current]?.content || '';
+                      const heading =
+                        current === analysisText
+                          ? shown
+                          : headings(current).find((h) => h.id === shown?.id);
+                      if (heading) jump(heading.line);
+                    }}
+                  />
                   {!outline.length && (
                     <div className="sidebar-empty">
                       {preview.allowed
@@ -3112,7 +3196,7 @@ export default function App() {
             onOpen={async (info, isCurrent) => {
               await flushAll();
               if (!isCurrent()) return;
-              await workspace(info);
+              await workspace(info, isCurrent);
               // Opening a project is several awaits long, and "cancel" can land in
               // any of the gaps. Without this check the cancelled project was
               // still shown.
@@ -3125,7 +3209,7 @@ export default function App() {
               if (!isCurrent()) return;
               const info = await bridge.libraryOpen(path);
               if (!isCurrent()) return;
-              await workspace(info);
+              await workspace(info, isCurrent);
               if (!isCurrent()) return;
               setShowHome(false);
               setProjectData(await bridge.projectOverview());
@@ -3133,9 +3217,20 @@ export default function App() {
             onChoose={() => choose('folder')}
             onResume={() => setShowHome(false)}
             onCancelOpen={async () => {
-              // `workspace()` has already repointed rootRef at the project being
-              // opened, so returning there is what the user just asked to undo.
-              const target = homeReturnRoot.current || rootRef.current;
+              ++navigation.current;
+              const snapshot = homeReturn.current;
+              const target = snapshot?.root || homeReturnRoot.current || rootRef.current;
+              if (snapshot) {
+                rootRef.current = snapshot.root;
+                setRoot(snapshot.root);
+                setTree(snapshot.tree);
+                setTreeLimited(snapshot.limited);
+                select(
+                  docsRef.current[snapshot.active]
+                    ? snapshot.active
+                    : Object.keys(docsRef.current)[0] || '',
+                );
+              }
               if (target) await bridge.activateWorkspace(target);
             }}
             onSettings={() => setModal('settings')}
