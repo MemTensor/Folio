@@ -22,7 +22,14 @@ import { bridge } from './bridge';
 import { t, errorMessage, getLocale } from './i18n';
 import { renderMarkdown, renderDiagrams } from './markdown';
 import DOMPurify from 'dompurify';
-import type { AgentConnection, AgentMessage, AgentSession, AgentHintResult } from './types';
+import type {
+  AgentConnection,
+  AgentMessage,
+  AgentSession,
+  AgentHintResult,
+  AgentSettingsTarget,
+} from './types';
+import { problemSettingsTarget } from './agent-settings-navigation.mjs';
 import { applyAgentEdits } from '../core/agent-edit.mjs';
 import { previewBudget } from './preview-budget.mjs';
 import './agent.css';
@@ -40,7 +47,8 @@ interface Props {
   onApply: (message: AgentMessage) => Promise<void>;
   onUndo: (message: AgentMessage) => Promise<void>;
   onClose: () => void;
-  onSettings: () => void;
+  onSettings: (target: AgentSettingsTarget) => void;
+  settingsReturn: number;
   onOpenReference: (path: string) => void;
   disabled: boolean;
 }
@@ -117,6 +125,7 @@ export function AgentPanel({
   onUndo,
   onClose,
   onSettings,
+  settingsReturn,
   onOpenReference,
   disabled,
 }: Props) {
@@ -161,6 +170,38 @@ export function AgentPanel({
   const [chosenEdits, setChosenEdits] = useState<Record<string, string[]>>({});
   const scroll = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const resumeFocus = useRef<{
+    from: number;
+    to: number;
+    direction: 'forward' | 'backward' | 'none';
+    scrollTop: number;
+  } | null>(null);
+  function openSettings(
+    target: AgentSettingsTarget = { provider: connection.provider || 'chatgpt' },
+  ) {
+    const field = composer.current;
+    if (field)
+      resumeFocus.current = {
+        from: field.selectionStart,
+        to: field.selectionEnd,
+        direction: field.selectionDirection,
+        scrollTop: scroll.current?.scrollTop || 0,
+      };
+    onSettings(target);
+  }
+  useEffect(() => {
+    if (!settingsReturn || !resumeFocus.current) return;
+    const position = resumeFocus.current;
+    const frame = requestAnimationFrame(() => {
+      const field = composer.current;
+      if (!field || field.disabled) return;
+      field.focus({ preventScroll: true });
+      field.setSelectionRange(position.from, position.to, position.direction);
+      if (scroll.current) scroll.current.scrollTop = position.scrollTop;
+      resumeFocus.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [settingsReturn]);
   const follow = useRef(true);
   const generation = useRef(0);
   const [localOutcomes, setLocalOutcomes] = useState<
@@ -426,7 +467,7 @@ export function AgentPanel({
             ]
               .filter(Boolean)
               .join(' · ')}
-            onClick={onSettings}
+            onClick={() => openSettings()}
           >
             <span>{connection.provider === 'api' ? t('兼容 API') : 'ChatGPT'}</span>
             <span className={'agent-dot ' + (ready ? 'ready' : '')} aria-hidden="true" />
@@ -508,8 +549,17 @@ export function AgentPanel({
                       : t('连接 Codex')}
             </button>
           )}
-          <button className="agent-quiet" onClick={onSettings}>
-            {t('使用兼容 API')}
+          <button
+            className="agent-quiet"
+            onClick={() =>
+              openSettings(
+                connection.provider === 'api'
+                  ? problemSettingsTarget(connection.message) || { provider: 'api' }
+                  : { provider: 'api' },
+              )
+            }
+          >
+            {connection.provider === 'api' ? t('检查连接设置') : t('使用兼容 API')}
           </button>
           {connection.waiting && (
             <>
@@ -553,9 +603,20 @@ export function AgentPanel({
         </section>
       )}
       {established && connection.phase === 'error' && connection.message && (
-        <p className="agent-connection-note" role="status">
-          {t(connection.message)}
-        </p>
+        <div className="agent-connection-note" role="status">
+          <span>{t(connection.message)}</span>
+          <button
+            onClick={() =>
+              openSettings(
+                problemSettingsTarget(connection.message) || {
+                  provider: connection.provider || 'chatgpt',
+                },
+              )
+            }
+          >
+            {t('检查连接设置')}
+          </button>
+        </div>
       )}
       <div
         className="agent-conversation"
@@ -610,6 +671,7 @@ export function AgentPanel({
         )}
         {session.messages.map((message, messageIndex) => {
           const outcome = localOutcomes[message.id] || message.outcome;
+          const settingsTarget = problemSettingsTarget(message.error);
           const original = session.messages
             .slice(0, messageIndex)
             .reverse()
@@ -676,6 +738,15 @@ export function AgentPanel({
                 <p className="agent-inline-error" role="alert">
                   {t(message.error)}
                 </p>
+              )}
+              {settingsTarget && (
+                <button
+                  className="agent-retry"
+                  disabled={session.running || busy || disabled}
+                  onClick={() => openSettings(settingsTarget)}
+                >
+                  {t('检查连接设置')}
+                </button>
               )}
               {message.status === 'interrupted' && (
                 <p className="agent-status-note">

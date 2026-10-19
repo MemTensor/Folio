@@ -327,7 +327,6 @@ module.exports = {
   '请先保存文档，再移入回收站。': 'Save the document before moving it to Trash.',
   '文件已移入回收站。': 'File moved to Trash.',
   移入回收站: 'Move to Trash',
-  保留这次写作: 'Keep your work',
   '还有未保存或待审阅的内容。你可以保存所有文档，或保留恢复草稿后关闭。':
     'Some changes are unsaved or need review. Save all documents, or keep recovery drafts before closing.',
   继续编辑: 'Keep editing',

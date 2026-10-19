@@ -2632,3 +2632,50 @@ kbd {
   margin-top: 10px;
   font-size: 11px;
 }
+
+.close-session-dialog {
+  width: min(540px, calc(100vw - 40px));
+}
+.close-session-options {
+  border: 0;
+  padding: 0;
+  margin: 22px 24px 20px;
+  min-width: 0;
+}
+.close-session-options legend {
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+.close-session-options label {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 16px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.close-session-options input {
+  accent-color: var(--accent);
+  flex-shrink: 0;
+  margin: 3px 0 0;
+}
+.close-session-options small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 5px;
+  line-height: 1.5;
+}
+.close-session-options .close-session-remember {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  margin-top: 20px;
+  color: var(--muted);
+}
+.close-session-dialog .modal-actions {
+  flex-wrap: wrap;
+}
+
+.close-session-dialog > .field-error {
+  margin: 16px 24px;
+}

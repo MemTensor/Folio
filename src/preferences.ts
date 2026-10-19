@@ -11,6 +11,7 @@ export interface Prefs {
   lineNumbers: boolean;
   reviewExternal: boolean;
   readingCopy: 'source' | 'rich';
+  restoreTabs: 'always' | 'never' | 'ask';
 }
 
 export const defaults: Prefs = {
@@ -26,4 +27,5 @@ export const defaults: Prefs = {
   lineNumbers: true,
   reviewExternal: false,
   readingCopy: 'rich',
+  restoreTabs: 'ask',
 };

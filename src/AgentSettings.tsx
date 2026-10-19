@@ -2,10 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { Sparkle, Key, CheckCircle } from '@phosphor-icons/react';
 import { bridge } from './bridge';
 import { t, errorMessage } from './i18n';
-import type { AgentConnection } from './types';
+import type { AgentConnection, AgentSettingsTarget } from './types';
 import { receiveAgentConnection } from './agent-connection.mjs';
+import { problemSettingsTarget, settingsReturnReady } from './agent-settings-navigation.mjs';
 
-export function AgentSettings() {
+export function AgentSettings({
+  target,
+  returnTo = 'settings',
+  onComplete,
+}: {
+  target?: AgentSettingsTarget;
+  returnTo?: 'document' | 'settings';
+  onComplete?: () => void;
+}) {
   const [configuration, setConfiguration] = useState<Awaited<
     ReturnType<typeof bridge.agentConfiguration>
   > | null>(null);
@@ -20,8 +29,12 @@ export function AgentSettings() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const current = useRef(true);
+  const holder = useRef<HTMLDivElement>(null);
+  const focused = useRef(false);
+  const returnIntent = useRef<'chatgpt' | 'api' | null>(null);
   const revision = useRef(-1);
   function updateConnection(value: AgentConnection) {
+    if (!current.current) return;
     if ((value.revision || 0) >= revision.current) {
       revision.current = value.revision || 0;
       receiveAgentConnection(value);
@@ -35,7 +48,18 @@ export function AgentSettings() {
     try {
       await operation();
     } catch (e) {
-      if (current.current) setError(t(errorMessage(e)));
+      returnIntent.current = null;
+      if (current.current) {
+        const message = errorMessage(e);
+        setError(t(message));
+        const field = problemSettingsTarget(message)?.field;
+        if (field)
+          requestAnimationFrame(() =>
+            holder.current
+              ?.querySelector<HTMLInputElement>(`[data-agent-setting="${field}"]`)
+              ?.focus(),
+          );
+      }
     } finally {
       if (current.current) setBusy(false);
     }
@@ -51,7 +75,7 @@ export function AgentSettings() {
       .then((value) => {
         if (!current.current) return;
         setConfiguration(value);
-        setProvider(value.provider);
+        setProvider(target?.provider || value.provider);
         setBaseURL(value.baseURL);
         setModel(value.model);
         setHintModel(value.hintModel);
@@ -69,6 +93,7 @@ export function AgentSettings() {
       });
     return () => {
       current.current = false;
+      returnIntent.current = null;
       off();
       void bridge.agentRelease(lease).catch(() => {});
     };
@@ -77,9 +102,38 @@ export function AgentSettings() {
     configuration?.provider === 'api' &&
     configuration.baseURL === baseURL.trim().replace(/\/+$/, '') &&
     configuration.model === model.trim() &&
+    configuration.hintModel === hintModel.trim() &&
     !key;
+  useEffect(() => {
+    if (!configuration || focused.current || !target) return;
+    focused.current = true;
+    const frame = requestAnimationFrame(() => {
+      const field =
+        target.provider === 'api'
+          ? target.field ||
+            (!configuration.model ? 'baseURL' : !configuration.hasKey ? 'key' : 'model')
+          : 'connect';
+      const element = holder.current?.querySelector<HTMLElement>(`[data-agent-setting="${field}"]`);
+      element?.focus({ preventScroll: true });
+      element?.scrollIntoView({ block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [configuration, target]);
+  useEffect(() => {
+    if (!current.current) return;
+    if (['error', 'missing', 'idle'].includes(connection.phase) && !busy)
+      returnIntent.current = null;
+    if (
+      onComplete &&
+      settingsReturnReady(returnIntent.current, provider, connection, apiSaved, busy)
+    ) {
+      returnIntent.current = null;
+      onComplete();
+    }
+  }, [provider, connection, apiSaved, busy, onComplete]);
+  const returnLabel = returnTo === 'document' ? t('返回文档') : t('返回设置');
   return (
-    <div className="agent-settings">
+    <div className="agent-settings" ref={holder}>
       <p className="agent-settings-intro">
         {t('选择文档助手的接入方式。文档与改动审阅使用同一个面板。')}
       </p>
@@ -87,7 +141,10 @@ export function AgentSettings() {
         <button
           aria-pressed={provider === 'chatgpt'}
           disabled={busy || !configuration}
-          onClick={() => setProvider('chatgpt')}
+          onClick={() => {
+            returnIntent.current = null;
+            setProvider('chatgpt');
+          }}
         >
           <Sparkle size={19} />
           <span>
@@ -97,7 +154,10 @@ export function AgentSettings() {
         <button
           aria-pressed={provider === 'api'}
           disabled={busy || !configuration}
-          onClick={() => setProvider('api')}
+          onClick={() => {
+            returnIntent.current = null;
+            setProvider('api');
+          }}
         >
           <Key size={19} />
           <span>
@@ -126,10 +186,12 @@ export function AgentSettings() {
           )}
           <div className="agent-settings-actions">
             <button
+              data-agent-setting="connect"
               className="primary"
               disabled={busy || !bridge.desktop}
               onClick={() =>
                 void run(async () => {
+                  returnIntent.current = 'chatgpt';
                   if (configuration?.provider !== 'chatgpt')
                     setConfiguration(await bridge.agentConfigure({ provider: 'chatgpt' }));
                   let value = await bridge.agentConnect();
@@ -139,10 +201,16 @@ export function AgentSettings() {
               }
             >
               {connection.provider !== 'api' && connection.phase === 'ready'
-                ? t('重新检查连接')
+                ? onComplete
+                  ? returnLabel
+                  : t('重新检查连接')
                 : connection.waiting && connection.loginURL
                   ? t('打开登录页')
-                  : t('登录或连接 ChatGPT')}
+                  : onComplete
+                    ? returnTo === 'document'
+                      ? t('连接并返回文档')
+                      : t('连接并返回设置')
+                    : t('登录或连接 ChatGPT')}
             </button>
             {connection.provider !== 'api' && connection.waiting && (
               <>
@@ -162,7 +230,10 @@ export function AgentSettings() {
                 <button
                   disabled={busy}
                   onClick={() =>
-                    void run(async () => updateConnection(await bridge.agentCancelLogin()))
+                    void run(async () => {
+                      returnIntent.current = null;
+                      updateConnection(await bridge.agentCancelLogin());
+                    })
                   }
                 >
                   {t('取消登录')}
@@ -177,6 +248,7 @@ export function AgentSettings() {
           <label>
             {t('API 基础地址')}
             <input
+              data-agent-setting="baseURL"
               aria-label={t('API 基础地址')}
               value={baseURL}
               disabled={busy}
@@ -189,6 +261,7 @@ export function AgentSettings() {
           <label>
             API Key
             <input
+              data-agent-setting="key"
               aria-label="Agent API Key"
               type="password"
               value={key}
@@ -206,6 +279,7 @@ export function AgentSettings() {
           <label>
             {t('模型名称')}
             <input
+              data-agent-setting="model"
               aria-label={t('模型名称')}
               list="agent-api-models"
               value={model}
@@ -246,6 +320,7 @@ export function AgentSettings() {
               disabled={busy || !bridge.desktop || !baseURL.trim() || !model.trim()}
               onClick={() =>
                 void run(async () => {
+                  returnIntent.current = 'api';
                   const value = await bridge.agentConfigure({
                     provider: 'api',
                     baseURL,
@@ -257,11 +332,17 @@ export function AgentSettings() {
                   setConfiguration(value);
                   setBaseURL(value.baseURL);
                   setModel(value.model);
+                  setHintModel(value.hintModel);
                   setMessage(t('API 设置已保存。'));
+                  updateConnection(await bridge.agentStatus());
                 })
               }
             >
-              {t('保存并连接')}
+              {onComplete
+                ? returnTo === 'document'
+                  ? t('保存并返回文档')
+                  : t('保存并返回设置')
+                : t('保存并连接')}
             </button>
             <button
               disabled={busy || !apiSaved || !bridge.desktop}
@@ -286,7 +367,12 @@ export function AgentSettings() {
           <span>{t('断开后暂停自动恢复，登录信息仍保留。')}</span>
           <button
             disabled={busy || !bridge.desktop}
-            onClick={() => void run(async () => updateConnection(await bridge.agentDisconnect()))}
+            onClick={() =>
+              void run(async () => {
+                returnIntent.current = null;
+                updateConnection(await bridge.agentDisconnect());
+              })
+            }
           >
             {t('断开连接')}
           </button>

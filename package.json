@@ -1,7 +1,7 @@
 {
   "name": "folio-markdown",
   "productName": "Folio",
-  "version": "0.5.0-beta.21",
+  "version": "0.5.0-beta.22",
   "private": true,
   "license": "UNLICENSED",
   "repository": {
@@ -9,7 +9,7 @@
     "url": "https://github.com/MemTensor/Folio.git"
   },
   "type": "module",
-  "description": "A quiet Markdown editor for people and their coding agents.",
+  "description": "A local Markdown workspace for people and Agents.",
   "author": "Folio contributors",
   "main": "electron/main.cjs",
   "scripts": {

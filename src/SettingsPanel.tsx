@@ -10,6 +10,7 @@ import {
   Sparkle,
   Brain,
   Info,
+  SlidersHorizontal,
 } from '@phosphor-icons/react';
 import { Modal } from './App';
 import { AgentSettings } from './AgentSettings';
@@ -21,7 +22,8 @@ import { t } from './i18n';
 import type { Prefs } from './preferences';
 import type { ProjectOverview, UpdateState } from './types';
 
-type Section = 'appearance' | 'writing' | 'reading' | 'projects' | 'agent' | 'memory' | 'about';
+type Section =
+  'general' | 'appearance' | 'writing' | 'reading' | 'projects' | 'agent' | 'memory' | 'about';
 const advanced = (section: Section) =>
   section === 'agent' || section === 'memory' || section === 'about';
 
@@ -57,6 +59,7 @@ export function SettingsPanel({
   const scrolls = useRef(new Map<Section, number>()),
     content = useRef<HTMLDivElement>(null);
   const categories = [
+    ['general', t('通用'), SlidersHorizontal],
     ['appearance', t('外观'), Sun],
     ['writing', t('写作'), PencilSimple],
     ['reading', t('阅读'), BookOpen],
@@ -135,6 +138,32 @@ export function SettingsPanel({
         </nav>
         <div className="settings-content" ref={content} data-settings-page={section}>
           <h3 className="settings-section-title">{title}</h3>
+          {section === 'general' && (
+            <div className="settings-body">
+              <label className="setting-row">
+                <span>{t('启动时恢复标签')}</span>
+                <select
+                  aria-label={t('启动时恢复标签')}
+                  value={prefs.restoreTabs}
+                  onChange={(event) =>
+                    setPrefs((p) => ({
+                      ...p,
+                      restoreTabs: event.target.value as Prefs['restoreTabs'],
+                    }))
+                  }
+                >
+                  <option value="always">{t('开启')}</option>
+                  <option value="never">{t('关闭')}</option>
+                  <option value="ask">{t('每次询问')}</option>
+                </select>
+              </label>
+              <p className="panel-intro">
+                {t(
+                  '关闭窗口或退出时，决定下次是否恢复打开的标签。关闭标签不会删除文档或恢复草稿。',
+                )}
+              </p>
+            </div>
+          )}
           {section === 'appearance' && (
             <div className="settings-body">
               <div className="theme-options">
@@ -239,7 +268,19 @@ export function SettingsPanel({
               </button>
             </div>
           )}
-          {section === 'agent' && <AgentSettings />}
+          {section === 'agent' && (
+            <AgentSettings
+              onComplete={() => {
+                const destination = parent.current;
+                navigate(destination);
+                requestAnimationFrame(() =>
+                  content.current?.parentElement
+                    ?.querySelector<HTMLButtonElement>(`[data-settings-section="${destination}"]`)
+                    ?.focus(),
+                );
+              }}
+            />
+          )}
           {section === 'memory' && <MemorySettings workspace={root} />}
           {section === 'about' && (
             <>

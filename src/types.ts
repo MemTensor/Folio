@@ -192,6 +192,10 @@ export interface AgentConnection {
     inputModalities?: string[];
   }[];
 }
+export interface AgentSettingsTarget {
+  provider: 'chatgpt' | 'api';
+  field?: 'baseURL' | 'key' | 'model';
+}
 export interface AgentSession {
   root: string;
   messages: AgentMessage[];

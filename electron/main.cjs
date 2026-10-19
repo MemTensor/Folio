@@ -71,6 +71,7 @@ let win,
   library,
   dingtalk,
   allowClose = false,
+  rendererReady = false,
   dirty = false,
   pendingFile,
   configuration = {};
@@ -860,7 +861,10 @@ async function init() {
     return updater.snapshot();
   });
   handle('update-open-page', () => shell.openExternal(RELEASE_PAGE));
-  handle('update-boot-ready', () => updater.bootReady());
+  handle('update-boot-ready', () => {
+    rendererReady = true;
+    return updater.bootReady();
+  });
   handle('update-begin-install', () => {
     if (updateGate.writes || updateGate.activeTicket())
       throw Error('文档操作尚未完成，请稍后再更新。');
@@ -931,6 +935,8 @@ function createWindow() {
     }
   });
   win.webContents.on('render-process-gone', () => {
+    rendererReady = false;
+    dirty = false;
     agent?.releasePanels();
     if (!updateQuitAuthorized) void abortPendingUpdate();
   });
@@ -947,7 +953,7 @@ function createWindow() {
       send('notice', '更新准备中，请稍候。');
       return;
     }
-    if (dirty && !allowClose) {
+    if ((rendererReady || dirty) && !allowClose) {
       event.preventDefault();
       command('close-request');
     }

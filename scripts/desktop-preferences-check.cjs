@@ -59,7 +59,7 @@ async function verifyPreferences(window, language, imageRequests, capturePath) {
     content: document.querySelector('.settings-content').getBoundingClientRect().left,
     height: document.querySelector('.settings-dialog').getBoundingClientRect().height,
   }));
-  assert.equal(layout.count, 7);
+  assert.equal(layout.count, 8);
   assert(layout.nav <= layout.content);
   assert(layout.height <= 600);
   const font = await evaluate(
@@ -97,6 +97,17 @@ async function verifyPreferences(window, language, imageRequests, capturePath) {
       () => document.querySelector('.settings-content').dataset.settingsPage === 'appearance',
     );
   }
+  await evaluate(() => document.querySelector('[data-settings-section="writing"]').click());
+  await evaluate(() => document.querySelector('[data-settings-section="agent"]').click());
+  await wait(
+    () =>
+      !!document.querySelector('.agent-settings') &&
+      !document.querySelectorAll('.agent-provider-options button')[0]?.disabled,
+  );
+  await click('.agent-settings-actions', en ? 'Connect and return to settings' : '连接并返回设置');
+  await wait(() => document.querySelector('.settings-content')?.dataset.settingsPage === 'writing');
+  await wait(() => document.activeElement?.getAttribute('data-settings-section') === 'writing');
+  assert.equal(await evaluate(() => document.querySelectorAll('.modal-backdrop').length), 1);
   await evaluate(() => document.querySelector('[data-settings-section="reading"]').click());
   await wait(
     () =>

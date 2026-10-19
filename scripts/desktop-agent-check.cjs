@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-async function verifyAgentPanel(window, original, capturePath, language) {
+async function verifyAgentPanel(window, original, capturePath, language, fixtures) {
   const web = window.webContents;
   const evaluate = (fn, ...args) =>
     web.executeJavaScript(`(${fn})(${args.map((v) => JSON.stringify(v)).join(',')})`);
@@ -12,7 +12,7 @@ async function verifyAgentPanel(window, original, capturePath, language) {
       if (await evaluate(check)) return;
       await pause();
     }
-    throw Error('Agent panel UI timed out.');
+    throw Error('Agent panel UI timed out: ' + check.toString());
   }
   const en = language === 'en';
   const labels = {
@@ -76,7 +76,83 @@ async function verifyAgentPanel(window, original, capturePath, language) {
   assert(layout.height > 600);
   assert(layout.composerVisible);
   assert.equal(layout.display, 'flex');
-  await clickLabel(labels.connect);
+  // Opening configuration must keep the same composer and its selected text alive.
+  async function draft(text) {
+    await evaluate((text) => {
+      const field = document.querySelector('.agent-composer textarea');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, text);
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.focus();
+      field.setSelectionRange(3, 10, 'backward');
+    }, text);
+    await pause();
+  }
+  async function settingsButton(label) {
+    assert(
+      await evaluate((label) => {
+        const button = [...document.querySelectorAll('.agent-settings button')].find(
+          (b) => b.textContent.trim() === label,
+        );
+        if (!button || button.disabled) return false;
+        button.click();
+        return true;
+      }, label),
+    );
+    await pause();
+  }
+  async function expectDraft(text) {
+    await wait(
+      () =>
+        !document.querySelector('.modal-backdrop') &&
+        document.activeElement === document.querySelector('.agent-composer textarea'),
+    );
+    assert.deepEqual(
+      await evaluate(() => {
+        const field = document.querySelector('.agent-composer textarea');
+        return [field.value, field.selectionStart, field.selectionEnd, field.selectionDirection];
+      }),
+      [text, 3, 10, 'backward'],
+    );
+  }
+  await draft('GENERATED_SETTINGS_DRAFT');
+  await clickLabel(en ? 'Use a compatible API' : '使用兼容 API');
+  await wait(
+    () =>
+      !!document.querySelector('.agent-api-settings') &&
+      !document.querySelectorAll('.agent-provider-options button')[1].disabled,
+  );
+  assert.equal(await evaluate(() => document.activeElement?.dataset.agentSetting), 'baseURL');
+  await evaluate(() => {
+    const field = document.querySelector('[data-agent-setting="model"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(
+      field,
+      'generated-model',
+    );
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await pause();
+  await settingsButton(en ? 'Save and return to document' : '保存并返回文档');
+  await wait(() => !!document.querySelector('.agent-settings [role="alert"]'));
+  await wait(() => document.activeElement?.dataset.agentSetting === 'key');
+  await evaluate(() => document.querySelector('.modal-heading .icon-button').click());
+  await expectDraft('GENERATED_SETTINGS_DRAFT');
+
+  fixtures.requireLogin();
+  await clickLabel(en ? 'Agent settings' : 'Agent 设置');
+  await wait(() => !document.querySelectorAll('.agent-provider-options button')[0]?.disabled);
+  await settingsButton(en ? 'Connect and return to document' : '连接并返回文档');
+  await wait(() =>
+    [...document.querySelectorAll('.agent-settings button')].some((b) =>
+      ['打开登录页', 'Open sign-in page'].includes(b.textContent.trim()),
+    ),
+  );
+  assert(
+    await evaluate(() => !!document.querySelector('.agent-settings')),
+    'Login must wait for completion',
+  );
+  fixtures.completeLogin();
+  await expectDraft('GENERATED_SETTINGS_DRAFT');
+
   await wait(() => !!document.querySelector('.agent-provider-button .agent-dot.ready'));
   assert.equal(
     await evaluate(() =>
@@ -232,11 +308,11 @@ async function verifyAgentPanel(window, original, capturePath, language) {
   // must automatically reconnect and ignore the stale IPC snapshot while
   // retaining the completed conversation and the accepted proposal.
   await clickLabel(labels.close);
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 200));
   await clickLabel(labels.open);
   assert.equal(await evaluate(() => !!document.querySelector('.agent-dot.ready')), true);
   await wait(() => !!document.querySelector('.agent-dot.ready'));
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 200));
   assert.equal(await evaluate(() => !!document.querySelector('.agent-dot.ready')), true);
   assert.equal(await evaluate(() => !!document.querySelector('.agent-connect-card')), false);
   assert.equal(await evaluate(() => document.querySelector('.agent-effort').value), 'high');
@@ -321,7 +397,7 @@ async function verifyAgentPanel(window, original, capturePath, language) {
     await web.executeJavaScript(
       'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 200));
     await fs.writeFile(
       path.join(path.dirname(capturePath), path.basename(capturePath, '.png') + '-narrow.png'),
       (await web.capturePage()).toPNG(),
@@ -337,7 +413,7 @@ async function verifyAgentPanel(window, original, capturePath, language) {
     await web.executeJavaScript(
       'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 200));
     await fs.writeFile(
       path.join(path.dirname(capturePath), path.basename(capturePath, '.png') + '-sepia.png'),
       (await web.capturePage()).toPNG(),
@@ -373,7 +449,20 @@ async function verifyAgentPanel(window, original, capturePath, language) {
   await clickDocumentAction(labels.open);
   await wait(() => !!document.querySelector('.agent-dot.ready'));
   assert.equal(await evaluate(() => !!document.querySelector('.error-banner')), false);
-  await clickLabel(en ? 'Agent settings' : 'Agent 设置');
+  await draft('GENERATED_API_RETURN_DRAFT');
+  const beforeSettings = await evaluate(() => ({
+    path: document.querySelector('.document-surface').dataset.documentPath,
+    content: document.querySelector('.cm-content')?.textContent,
+    count: document.querySelectorAll('.agent-message').length,
+    userCount: document.querySelectorAll('.agent-message.user').length,
+  }));
+  await fixtures.authorizationFailure();
+  await wait(() =>
+    [...document.querySelectorAll('.agent-message button')].some((b) =>
+      ['检查连接设置', 'Check connection settings'].includes(b.textContent.trim()),
+    ),
+  );
+  await clickLabel(en ? 'Check connection settings' : '检查连接设置');
   await wait(
     () =>
       !!document.querySelector('.agent-provider-options') &&
@@ -388,7 +477,13 @@ async function verifyAgentPanel(window, original, capturePath, language) {
     previewContext,
   );
   assert.equal(blockedPreview.available, false, 'Modal UI must never be captured for the model.');
-  await evaluate(() => document.querySelectorAll('.agent-provider-options button')[1].click());
+  await wait(() => document.activeElement?.dataset.agentSetting === 'key');
+  assert.equal(
+    await evaluate(() =>
+      document.querySelectorAll('.agent-provider-options button')[1].getAttribute('aria-pressed'),
+    ),
+    'true',
+  );
   await evaluate((en) => {
     const values = [
       [en ? 'API base URL' : 'API 基础地址', 'https://generated-provider.invalid/v1'],
@@ -407,7 +502,23 @@ async function verifyAgentPanel(window, original, capturePath, language) {
       [...document.querySelectorAll('.agent-settings-actions button')]
         .find((b) => b.textContent.trim() === label)
         .click(),
-    en ? 'Save and connect' : '保存并连接',
+    en ? 'Save and return to document' : '保存并返回文档',
+  );
+  await expectDraft('GENERATED_API_RETURN_DRAFT');
+  assert.equal(
+    await evaluate(() => document.querySelector('.document-surface').dataset.documentPath),
+    beforeSettings.path,
+  );
+  assert.equal(
+    await evaluate(() => document.querySelectorAll('.agent-message.user').length),
+    beforeSettings.userCount,
+    'Configuration must not send the draft',
+  );
+  await clickLabel(en ? 'Agent settings' : 'Agent 设置');
+  await wait(
+    () =>
+      !!document.querySelector('.agent-api-settings') &&
+      !document.querySelectorAll('.agent-provider-options button')[1].disabled,
   );
   await wait(
     () =>
@@ -465,7 +576,7 @@ async function verifyAgentPanel(window, original, capturePath, language) {
     await web.executeJavaScript(
       'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 200));
     const image = await web.capturePage();
     await fs.writeFile(
       path.join(path.dirname(capturePath), path.basename(capturePath, '.png') + '-settings.png'),
@@ -517,6 +628,9 @@ async function verifyAgentPanel(window, original, capturePath, language) {
     visualPreviewRequested: true,
     toolbarStableAcrossPanels: true,
     directDocumentActions: true,
+    settingsReturnPreservesDraft: true,
+    apiFailureFocus: true,
+    delayedLoginReturn: true,
     referenceSourcesDisplayedAndOpened: true,
   };
 }

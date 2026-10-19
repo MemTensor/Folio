@@ -743,3 +743,26 @@
     animation: none;
   }
 }
+
+.agent-document-settings .modal-heading h2 {
+  flex: 1;
+  margin-left: 18px;
+}
+.agent-settings-origin {
+  margin: 16px 24px 0;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-connection-note button {
+  color: var(--accent);
+  padding: 2px 0;
+  margin-left: 8px;
+  font-size: inherit;
+  border: 0;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

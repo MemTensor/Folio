@@ -84,6 +84,14 @@ import {
   Sparkle,
 } from '@phosphor-icons/react';
 import { bridge, bridgeActivity, demoExternal } from './bridge';
+import { CloseSessionDialog } from './CloseSessionDialog';
+import {
+  restoreTabsPreference,
+  readTabSession,
+  writeTabSession,
+  startupTabs,
+  needsClosePrompt,
+} from './tab-session.mjs';
 import {
   Editor,
   insertText,
@@ -105,6 +113,7 @@ import type {
   UpdateState,
   ProjectOverview,
   AgentMessage,
+  AgentSettingsTarget,
 } from './types';
 
 type Mode = 'live' | 'source' | 'read';
@@ -165,6 +174,7 @@ export function Modal({
   wide = false,
   onBack,
   closeLabel,
+  backLabel,
   className = '',
 }: {
   title: string;
@@ -173,6 +183,7 @@ export function Modal({
   wide?: boolean;
   onBack?: () => void;
   closeLabel?: string;
+  backLabel?: string;
   className?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -233,7 +244,7 @@ export function Modal({
           {onBack && (
             <button className="settings-back" onClick={onBack}>
               <CaretLeft size={17} />
-              {t('返回设置')}
+              {backLabel || t('返回设置')}
             </button>
           )}
           <h2>{title}</h2>
@@ -406,6 +417,7 @@ export default function App() {
         ...defaults,
         ...saved,
         readingCopy: saved.readingCopy === 'source' ? 'source' : 'rich',
+        restoreTabs: restoreTabsPreference(saved.restoreTabs),
       };
     } catch {
       return defaults;
@@ -463,6 +475,13 @@ export default function App() {
     [results, setResults] = useState<SearchResult[]>([]),
     [paletteQuery, setPaletteQuery] = useState(''),
     [paletteIndex, setPaletteIndex] = useState(0);
+  const [agentSettingsTarget, setAgentSettingsTarget] = useState<AgentSettingsTarget | undefined>();
+  const [agentSettingsReturn, setAgentSettingsReturn] = useState(0);
+  const [agentSettingsDocument, setAgentSettingsDocument] = useState('');
+  const closeAgentSettings = () => {
+    setModal(null);
+    setAgentSettingsReturn((value) => value + 1);
+  };
   const [quickFiles, setQuickFiles] = useState<{ path: string; name: string }[] | null>(null),
     [quickBusy, setQuickBusy] = useState(false),
     [quickError, setQuickError] = useState('');
@@ -474,6 +493,10 @@ export default function App() {
       requestId?: string;
       committed: boolean;
     } | null>(null);
+  const closing = useRef(false),
+    queuedCloseFiles = useRef(new Map<string, FileEvent>());
+  const [closingWindow, setClosingWindow] = useState(false);
+  const [closeError, setCloseError] = useState('');
   const documentEpoch = useRef(0),
     activeActions = useRef(0),
     queuedUpdateFiles = useRef(new Map<string, FileEvent>()),
@@ -588,6 +611,7 @@ export default function App() {
     fn: () => Promise<unknown>,
     kind: 'action' | 'draft' | 'background' = 'action',
   ) => {
+    if (kind === 'action' && closing.current) return;
     if (kind === 'action' && updatePreparation.current) {
       notify(t('正在准备更新，请等待完成。'));
       return;
@@ -719,7 +743,7 @@ export default function App() {
     }
   }
   function schedule(p: string) {
-    if (updatePreparation.current) return;
+    if (updatePreparation.current || closing.current) return;
     clearTimeout(timers.current.get(p));
     clearTimeout(draftTimers.current.get(p));
     draftTimers.current.set(
@@ -788,6 +812,7 @@ export default function App() {
       current = docsRef.current[p];
     if (
       updatePreparation.current ||
+      closing.current ||
       richEditing.current ||
       !current ||
       activeRef.current !== p ||
@@ -822,6 +847,10 @@ export default function App() {
     notify(t(undo ? '已撤销 Agent 修改。' : '已应用 Agent 修改，可以撤销或在历史版本中恢复。'));
   }
   async function external(event: FileEvent) {
+    if (closing.current) {
+      queuedCloseFiles.current.set(event.path, event);
+      return;
+    }
     if (updatePreparation.current) {
       updatePreparation.current.invalidated = true;
       queuedUpdateFiles.current.set(event.path, event);
@@ -849,6 +878,16 @@ export default function App() {
     bridgeActivity.setFrozen(false);
     setInstallingUpdate(false);
     editor.current?.lock(false);
+    try {
+      writeTabSession(
+        localStorage,
+        Object.keys(docsRef.current),
+        activeRef.current,
+        prefRef.current.restoreTabs !== 'never',
+      );
+    } catch (e) {
+      fail(e);
+    }
     const events = [...queuedUpdateFiles.current.values()];
     queuedUpdateFiles.current.clear();
     for (const event of events)
@@ -896,7 +935,7 @@ export default function App() {
       waitDrafts: () => bridgeActivity.waitDrafts(),
       flush: async () => {
         await flushAll();
-        localStorage.setItem('folio-open-tabs', JSON.stringify(Object.keys(docsRef.current)));
+        writeTabSession(localStorage, Object.keys(docsRef.current), activeRef.current, true, true);
         if (activeRef.current)
           localStorage.setItem(
             'folio-last:' + (docsRef.current[activeRef.current]?.root || rootRef.current),
@@ -963,21 +1002,38 @@ export default function App() {
       .then(async (info) => {
         if (!live) return;
         openedFromSystem.current = !!info.initial;
-        await workspace(info);
-        let tabs: string[] = [];
-        try {
-          const saved = JSON.parse(localStorage.getItem('folio-open-tabs') || '[]');
-          if (Array.isArray(saved)) tabs = saved.filter((p) => typeof p === 'string').slice(-30);
-        } catch {}
+        const session = readTabSession(localStorage);
+        const tabs = startupTabs(session, prefRef.current.restoreTabs);
+        const previousActive = session?.active || localStorage.getItem('folio-last:' + info.root);
+        // A saved empty session is intentional; do not reopen the project's last file.
+        await workspace({
+          ...info,
+          initial: null,
+          autoOpen: session === null && prefRef.current.restoreTabs !== 'never' && !info.initial,
+        });
+        const restoreNavigation = navigation.current;
+        let unavailable = 0;
         for (const p of tabs) {
           if (!live || docsRef.current[p]) continue;
           try {
             await bridge.libraryOpen(p);
             await openFile(p, undefined, false);
           } catch {
-            /* Missing old tabs do not block opening a document. */
+            unavailable++;
           }
         }
+        if (!live) return;
+        if (navigation.current === restoreNavigation) {
+          if (info.initial) await openFile(info.initial);
+          else
+            select(
+              previousActive && docsRef.current[previousActive]
+                ? previousActive
+                : Object.keys(docsRef.current)[0] || '',
+            );
+        }
+        if (unavailable)
+          notify(t('{count} 个标签暂时无法恢复，可从最近文档重新打开。', { count: unavailable }));
         if (live && rootRef.current) await bridge.activateWorkspace(rootRef.current);
       })
       .catch(fail)
@@ -1056,8 +1112,11 @@ export default function App() {
       !!table ||
         Object.values(docs).some((d) => changed(d) || d.pending !== undefined || d.restorePending),
     );
-    if (!loading) localStorage.setItem('folio-open-tabs', JSON.stringify(Object.keys(docs)));
   }, [docs, loading, table]);
+  useEffect(() => {
+    if (!loading && !closing.current && !updatePreparation.current)
+      writeTabSession(localStorage, Object.keys(docs), active, prefs.restoreTabs !== 'never');
+  }, [docs, active, loading, prefs.restoreTabs]);
   const openDocumentPaths = JSON.stringify(Object.keys(docs));
   useEffect(() => {
     void bridge.watchDocuments(JSON.parse(openDocumentPaths)).catch(fail);
@@ -1372,7 +1431,12 @@ export default function App() {
         delete next[p];
       }
       replaceDocuments(next);
-      localStorage.setItem('folio-open-tabs', JSON.stringify(Object.keys(next)));
+      writeTabSession(
+        localStorage,
+        Object.keys(next),
+        activeRef.current,
+        prefRef.current.restoreTabs !== 'never',
+      );
       localStorage.removeItem('folio-last:' + project.root);
       if (paths.includes(activeRef.current) || rootRef.current === project.root) {
         const remaining = Object.keys(next).at(-1);
@@ -1560,6 +1624,7 @@ export default function App() {
     } else await actionRef.current(id);
   }
   async function action(id: string) {
+    if (modal === 'close' && id !== 'close-request') return;
     if (firstRun && !['settings', 'updates', 'close-request'].includes(id)) return;
     if (
       showHome &&
@@ -1690,7 +1755,26 @@ export default function App() {
       const guide = allFiles.find((f) => f.name === 'Markdown 语法手册.md');
       if (guide) await openFile(guide.path);
       else notify(t('语法手册位于应用首次启动的示例文件夹中。'));
-    } else if (id === 'close-request') setModal('close');
+    } else if (id === 'close-request') {
+      if (
+        loading ||
+        restoringHistory.current ||
+        activeActions.current > 1 ||
+        bridgeActivity.pendingWrites() ||
+        Object.values(docsRef.current).some((d) => d.saving) ||
+        editor.current?.view.composing
+      ) {
+        notify(t('请等待当前操作完成，再关闭窗口。'));
+        return;
+      }
+      const unsaved = hasUnsavedDocuments();
+      if (
+        needsClosePrompt(prefRef.current.restoreTabs, Object.keys(docsRef.current).length, unsaved)
+      ) {
+        setCloseError('');
+        setModal('close');
+      } else await closeSession(false, prefRef.current.restoreTabs !== 'never', false);
+    }
   }
   const actionRef = useRef(action);
   actionRef.current = action;
@@ -1893,6 +1977,87 @@ export default function App() {
       if (locked && editor.current === locked) locked.lock(false);
     }
   }
+  function hasUnsavedDocuments() {
+    return Object.values(docsRef.current).some(
+      (d) => changed(d) || d.pending !== undefined || d.restorePending || d.saving,
+    );
+  }
+  async function closeSession(saveFirst: boolean, restore: boolean, remember: boolean) {
+    if (closing.current) return;
+    if (
+      restoringHistory.current ||
+      activeActions.current > 1 ||
+      bridgeActivity.pendingWrites() ||
+      Object.values(docsRef.current).some((d) => d.saving)
+    ) {
+      notify(t('请等待当前操作完成，再关闭窗口。'));
+      return;
+    }
+    closing.current = true;
+    setClosingWindow(true);
+    editor.current?.lock(true);
+    timers.current.forEach(clearTimeout);
+    timers.current.clear();
+    draftTimers.current.forEach(clearTimeout);
+    draftTimers.current.clear();
+    const previousPrefs = prefRef.current;
+    let remembered = false,
+      closed = false;
+    try {
+      if (saveFirst) {
+        for (const p of Object.keys(docsRef.current)) await save(p);
+        if (hasUnsavedDocuments()) {
+          setModal(null);
+          notify(t('还有待审阅的修改，已保留窗口。'));
+          return;
+        }
+      }
+      // Drain older draft writes before the final snapshot, so they cannot overwrite it.
+      await bridgeActivity.waitDrafts();
+      const epoch = documentEpoch.current;
+      await flushAll();
+      if (epoch !== documentEpoch.current) throw Error(t('文档刚刚发生变化，请处理后重试。'));
+      writeTabSession(localStorage, Object.keys(docsRef.current), activeRef.current, restore);
+      if (remember && previousPrefs.restoreTabs === 'ask') {
+        const next = {
+          ...previousPrefs,
+          restoreTabs: restore ? ('always' as const) : ('never' as const),
+        };
+        localStorage.setItem('folio-preferences', JSON.stringify(next));
+        prefRef.current = next;
+        setPrefs(next);
+        remembered = true;
+      }
+      await bridge.close();
+      closed = true;
+    } finally {
+      if (!closed) {
+        closing.current = false;
+        setClosingWindow(false);
+        editor.current?.lock(false);
+        if (remembered) {
+          prefRef.current = previousPrefs;
+          setPrefs(previousPrefs);
+          try {
+            localStorage.setItem('folio-preferences', JSON.stringify(previousPrefs));
+          } catch {}
+        }
+        try {
+          writeTabSession(
+            localStorage,
+            Object.keys(docsRef.current),
+            activeRef.current,
+            previousPrefs.restoreTabs !== 'never',
+          );
+        } catch {}
+        const events = [...queuedCloseFiles.current.values()];
+        queuedCloseFiles.current.clear();
+        for (const event of events) await external(event);
+        for (const [p, current] of Object.entries(docsRef.current))
+          if (documentDraft(current)) schedule(p);
+      }
+    }
+  }
   async function closeTab(p: string) {
     await flushDraft(p);
     clearTimeout(timers.current.get(p));
@@ -2016,7 +2181,7 @@ export default function App() {
           </IconButton>
         </div>
       </header>
-      <div className="workspace" inert={showHome || firstRun}>
+      <div className="workspace" inert={showHome || firstRun || modal === 'close' || closingWindow}>
         {sidebar && !zen && (
           <aside className="sidebar">
             <div className="workspace-name">
@@ -2555,7 +2720,12 @@ export default function App() {
                 onApply={applyAgentProposal}
                 onUndo={(message) => applyAgentProposal(message, true)}
                 onClose={() => setPanel(null)}
-                onSettings={() => setModal('agent-settings')}
+                settingsReturn={agentSettingsReturn}
+                onSettings={(target) => {
+                  setAgentSettingsTarget(target);
+                  setAgentSettingsDocument(nameOf(activeRef.current));
+                  setModal('agent-settings');
+                }}
                 onOpenReference={(path) => guarded(() => openFile(path))}
                 disabled={
                   !!updatePreparation.current ||
@@ -2980,8 +3150,24 @@ export default function App() {
         />
       )}
       {modal === 'agent-settings' && (
-        <Modal title={t('Agent 设置')} onClose={() => setModal(null)}>
-          <AgentSettings />
+        <Modal
+          title={t('Agent 设置')}
+          onClose={closeAgentSettings}
+          onBack={closeAgentSettings}
+          backLabel={t('返回文档')}
+          closeLabel={t('关闭并返回文档')}
+          className="agent-document-settings"
+        >
+          {agentSettingsDocument && (
+            <p className="agent-settings-origin" title={agentSettingsDocument}>
+              {t('继续处理：{name}', { name: agentSettingsDocument })}
+            </p>
+          )}
+          <AgentSettings
+            target={agentSettingsTarget}
+            returnTo="document"
+            onComplete={closeAgentSettings}
+          />
         </Modal>
       )}
       {modal === 'settings' && (
@@ -3177,44 +3363,28 @@ export default function App() {
         </Modal>
       )}
       {modal === 'close' && (
-        <Modal title={t('保留这次写作')} onClose={() => setModal(null)}>
-          <p className="panel-intro">
-            {t('还有未保存或待审阅的内容。你可以保存所有文档，或保留恢复草稿后关闭。')}
-          </p>
-          <div className="modal-actions">
-            <button onClick={() => setModal(null)}>{t('继续编辑')}</button>
-            <button
-              onClick={() =>
-                guarded(async () => {
-                  await flushAll();
-                  await bridge.close();
-                })
+        <CloseSessionDialog
+          ask={prefs.restoreTabs === 'ask' && Object.keys(docs).length > 0}
+          unsaved={hasUnsavedDocuments()}
+          count={Object.keys(docs).length}
+          busy={closingWindow}
+          error={closeError}
+          onCancel={() => setModal(null)}
+          onConfirm={(saveFirst, restore, remember) =>
+            guarded(async () => {
+              setCloseError('');
+              try {
+                await closeSession(
+                  saveFirst,
+                  prefs.restoreTabs === 'ask' ? restore : prefs.restoreTabs !== 'never',
+                  remember,
+                );
+              } catch (e) {
+                setCloseError(errorMessage(e));
               }
-            >
-              {t('保留草稿并关闭')}
-            </button>
-            <button
-              className="primary"
-              onClick={() =>
-                guarded(async () => {
-                  for (const p of Object.keys(docsRef.current)) await save(p);
-                  if (
-                    Object.values(docsRef.current).some(
-                      (d) => changed(d) || d.pending !== undefined,
-                    )
-                  ) {
-                    setModal(null);
-                    notify(t('还有待审阅的修改，已保留窗口。'));
-                    return;
-                  }
-                  await bridge.close();
-                })
-              }
-            >
-              {t('保存并关闭')}
-            </button>
-          </div>
-        </Modal>
+            })
+          }
+        />
       )}
       {table &&
         (table.kind === 'math' || table.kind === 'diagram' ? (

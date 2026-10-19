@@ -16,6 +16,7 @@ const { verifyBlockSelection } = require('./desktop-block-check.cjs');
 const { verifyAgentPanel } = require('./desktop-agent-check.cjs');
 const { verifyContextMenu } = require('./desktop-context-check.cjs');
 const { verifyPreferences } = require('./desktop-preferences-check.cjs');
+const { verifyTabSession } = require('./desktop-tab-session-check.cjs');
 const { contextItems } = require('../electron/context-menu.cjs');
 
 const temporary = path.resolve(process.argv[2]),
@@ -127,6 +128,7 @@ async function run() {
   const agentClient = new EventEmitter();
   agentClient.cwd = temporary;
   agentClient.started = false;
+  let loggedIn = true;
   let threadCounter = 0,
     retryRequests = 0;
   agentClient.start = async () => {
@@ -138,7 +140,16 @@ async function run() {
   };
   agentClient.request = async (method, params) => {
     if (method === 'account/read')
-      return { account: { type: 'chatgpt', planType: 'pro', email: 'fixture@example.invalid' } };
+      return {
+        account: loggedIn
+          ? { type: 'chatgpt', planType: 'pro', email: 'fixture@example.invalid' }
+          : null,
+      };
+    if (method === 'account/login/start')
+      return {
+        loginId: 'generated-login',
+        authUrl: 'https://auth.openai.com/oauth/authorize?state=generated',
+      };
     if (method === 'model/list')
       return {
         data: [
@@ -330,7 +341,18 @@ async function run() {
     }),
     onEvent: (event) => window?.webContents.send('agent-event', event),
   });
+  let bootstrapInitial = editableScenario ? file : null,
+    closes = 0,
+    failDrafts = false;
+  const drafts = new Map();
   const handlers = {
+    close: () => {
+      closes++;
+    },
+    'library-open': (p) => {
+      if (p !== file && p !== referenceFile) throw Error('Unexpected session document.');
+      return { root: workspace, tree };
+    },
     'clipboard-write-content': require('../electron/clipboard.cjs').createRichClipboardWriter({
       write(value) {
         clipboardWrites.push(value.text);
@@ -397,6 +419,8 @@ async function run() {
     'agent-test-api': () => agent.testAPI(),
     'agent-status': () => agent.status(),
     'agent-connect': () => agent.connect(),
+    'agent-login': () => agent.login(),
+    'agent-cancel-login': () => agent.cancelLogin(),
     'agent-acquire': async (lease) => {
       const before = agent.status();
       const restored = await agent.acquire(lease);
@@ -465,7 +489,7 @@ async function run() {
     bootstrap: () => ({
       root: workspace,
       tree,
-      initial: editableScenario ? file : null,
+      initial: bootstrapInitial,
       platform: process.platform,
     }),
     read: (p) => {
@@ -517,15 +541,18 @@ async function run() {
     'quick-open': () => [{ path: file, name: 'Startup.md' }],
     'draft-get': (p) => {
       if (p !== file && p !== referenceFile) throw Error('Unexpected draft path.');
-      return null;
+      return drafts.get(p) || null;
     },
     ...(scenario === 'table-edit' ||
     scenario === 'agent' ||
     scenario === 'home' ||
     scenario === 'normal'
       ? {
-          'draft-put': (p) => {
-            if (p !== file) throw Error('Unexpected draft path.');
+          'draft-put': (p, draft) => {
+            if (p !== file && p !== referenceFile) throw Error('Unexpected draft path.');
+            if (failDrafts) throw Error('Generated draft persistence failure.');
+            if (draft) drafts.set(p, draft);
+            else drafts.delete(p);
           },
           save: async (args) => {
             if (args.path !== file) throw Error('Unexpected save path.');
@@ -739,7 +766,32 @@ async function run() {
           : null;
       const agentPanel =
         scenario === 'agent'
-          ? await verifyAgentPanel(window, content, capturePath, language)
+          ? await verifyAgentPanel(window, content, capturePath, language, {
+              requireLogin: () => {
+                loggedIn = false;
+              },
+              completeLogin: () => {
+                loggedIn = true;
+                agentClient.emit('notification', 'account/login/completed', {
+                  loginId: 'generated-login',
+                  success: true,
+                });
+              },
+              authorizationFailure: async () => {
+                const value = structuredClone(await agent.session(workspace));
+                value.messages.push({
+                  id: 'generated-auth-error',
+                  role: 'assistant',
+                  path: file,
+                  text: '',
+                  error: 'API 授权失败，请在设置中检查 API Key。',
+                  provider: 'api',
+                  status: 'error',
+                  time: Date.now(),
+                });
+                window.webContents.send('agent-event', { type: 'session', session: value });
+              },
+            })
           : null;
       const preferences =
         scenario === 'normal'
@@ -755,6 +807,27 @@ async function run() {
               () => richClipboardWrites,
               content,
               language,
+            )
+          : null;
+      const tabSession =
+        scenario === 'normal'
+          ? await verifyTabSession(
+              window,
+              language,
+              {
+                file,
+                referenceFile,
+                noInitial: () => {
+                  bootstrapInitial = null;
+                },
+                boots: () => calls['update-boot-ready'] || 0,
+                closes: () => closes,
+                failDrafts: (value) => {
+                  failDrafts = value;
+                },
+                draft: (p) => drafts.get(p),
+              },
+              capturePath,
             )
           : null;
       if (errors.length || unexpectedIPC.length)
@@ -775,6 +848,7 @@ async function run() {
         ...(agentPanel ? { agentPanel } : {}),
         ...(contextMenu ? { contextMenu } : {}),
         ...(preferences ? { preferences } : {}),
+        ...(tabSession ? { tabSession } : {}),
         ...(capturePath ? { capturePath } : {}),
       });
     }
