@@ -4,7 +4,7 @@ Folio 是人与 Agent 共用的本地 Markdown 文档工作台。源码采用 Ap
 
 ## 开始
 
-先阅读 [产品简介](README.md)、[开发指南](docs/开发指南.md) 和 [架构与数据边界](docs/架构与数据边界.md)。安装依赖后运行 `npm run desktop`，使用 `FOLIO_DATA_DIR` 指向临时目录，避免开发状态与日常文档混用。
+先阅读 [产品简介](README.zh-CN.md)、[开发指南](docs/开发指南.md) 和 [架构与数据边界](docs/架构与数据边界.md)。安装依赖后运行 `npm run desktop`，使用 `FOLIO_DATA_DIR` 指向临时目录，避免开发状态与日常文档混用。
 
 ## 报告问题
 
