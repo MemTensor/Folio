@@ -28,7 +28,7 @@ Unzip the download and move `Folio.app` to Applications.
 
 The interface supports Simplified Chinese and English. Press **⌘ ,** for categorized settings. Find updates through **Folio → Check for updates** or **Settings → About and updates**.
 
-> This private test release requires access to [MemTensor/Folio](https://github.com/MemTensor/Folio). Developer ID signing and Apple notarization are pending. The project is `UNLICENSED`, with no open-source license grant. See [updates](docs/更新说明.md) for installation and private-release access.
+> This private test release requires access to [MemTensor/Folio](https://github.com/MemTensor/Folio). Developer ID signing and Apple notarization are pending. The current source is licensed under Apache-2.0. Distribution packages carry their own license files; the existing beta.22 archive predates the license files now included in this repository. See [updates](docs/更新说明.md) for installation and private-release access.
 
 ## Document workspace
 
@@ -130,6 +130,16 @@ npm run desktop
 Use `npm run check` to validate code and desktop flows, `npm run pack` to build the app, and `npm run dist` to create the distribution archive. See [contributing](CONTRIBUTING.md) for development conventions and [security](SECURITY.md) for reporting security issues.
 
 For connection or operation problems, copy or export diagnostics from **Settings → About and updates** or Agent settings. Local logs are capped at about 1 MB. They contain runtime events and error categories, excluding document text, conversations, credentials and sign-in links. Exporting does not send the report.
+
+## License and attribution
+
+Folio's original source code and documentation are licensed under the **[Apache License 2.0](LICENSE)**. The copyright holder is **MemTensor**, the author is **Zehao Lin**, and the source is [MemTensor/Folio](https://github.com/MemTensor/Folio). Redistributions must comply with the license and preserve applicable copyright and [NOTICE](NOTICE) attribution.
+
+Recommended citation:
+
+> Lin, Zehao. *Folio: A local Markdown workspace for people and Agents*. MemTensor. https://github.com/MemTensor/Folio
+
+Please identify the version or commit used when applicable. See [CITATION.cff](CITATION.cff) for machine-readable citation information and [AUTHORS.md](AUTHORS.md) for authorship. Third-party components retain their own licenses. Folio does not change the copyright or license of your documents.
 
 ## Roadmap
 

@@ -1,0 +1,13 @@
+Folio
+A local Markdown workspace for people and Agents.
+
+Copyright 2026 MemTensor
+Author: Zehao Lin
+Source: https://github.com/MemTensor/Folio
+
+Folio is licensed under the Apache License, Version 2.0.
+See LICENSE for the terms and conditions.
+
+Folio includes third-party components under their respective licenses.
+Application distributions provide third-party notices and source references
+in THIRD_PARTY_NOTICES.md and the third-party-licenses directory.

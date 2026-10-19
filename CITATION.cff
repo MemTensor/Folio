@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+type: software
+title: Folio
+message: "If you reference Folio, please use this citation and identify the version or commit used where applicable."
+authors:
+  - family-names: Lin
+    given-names: Zehao
+repository-code: "https://github.com/MemTensor/Folio"
+url: "https://github.com/MemTensor/Folio"
+license: Apache-2.0
+abstract: "A local Markdown workspace for people and Agents."

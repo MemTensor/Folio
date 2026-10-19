@@ -31,6 +31,10 @@ function run(args, { cwd = root } = {}) {
   });
 }
 
+const licensing = await run([path.join(root, 'scripts/verify-licensing-package.cjs'), bundle]);
+if (licensing.code !== 0 || !licensing.out.includes('"ok":true'))
+  throw Error('Packaged licensing check failed: ' + (licensing.err || licensing.out));
+
 const workspace = await run([path.join(root, 'scripts/verify-workspace-package.cjs'), bundle]);
 if (workspace.code !== 0 || !workspace.out.includes('"ok":true'))
   throw Error('Packaged workspace check failed: ' + (workspace.err || workspace.out));
@@ -52,5 +56,5 @@ if (cli.code !== 0 || !cli.out.includes(version))
   throw Error('Bundled CLI failed inside the package: ' + (cli.err || cli.out));
 
 console.log(
-  'Packaged bundle verified: asar workers, document catalog, Agent proposals, update source and the bundled CLI.',
+  'Packaged bundle verified: asar workers, document catalog, Agent proposals, update source, bundled CLI and license attribution.',
 );

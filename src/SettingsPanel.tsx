@@ -287,6 +287,11 @@ export function SettingsPanel({
               <div className="settings-body settings-about">
                 <strong>Folio {updateState?.currentVersion || '…'}</strong>
                 <p className="settings-description">
+                  © 2026 MemTensor · Apache-2.0
+                  <br />
+                  {t('作者：{name}', { name: 'Zehao Lin' })}
+                </p>
+                <p className="settings-description">
                   {t('文档以纯文本保存，历史与恢复草稿保存在应用数据目录。')}
                 </p>
                 <div className="settings-diagnostics-actions">

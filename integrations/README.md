@@ -58,3 +58,7 @@ python3 /path/to/plugin-creator/scripts/validate_plugin.py plugins/folio
 python3 /path/to/skill-creator/scripts/quick_validate.py plugins/folio/skills/folio
 claude plugin validate plugins/folio
 ```
+
+## 许可与署名
+
+Folio 插件和 skill 采用 Apache-2.0。版权主体为 MemTensor，作者为 Zehao Lin。无论分发完整插件还是独立 skill，都应保留其目录内的 LICENSE 和 NOTICE；NOTICE 中包含项目来源地址。第三方组件继续适用各自的许可。

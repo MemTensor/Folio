@@ -1,6 +1,6 @@
 # 参与开发
 
-Folio 是人与 Agent 共用的本地 Markdown 文档工作台。当前仓库为私有，未授予开源许可；本说明供已获访问权限的协作者使用。
+Folio 是人与 Agent 共用的本地 Markdown 文档工作台。源码采用 Apache-2.0，版权主体为 MemTensor，作者为 Zehao Lin；仓库仍为私有，本说明供已获访问权限的协作者使用。
 
 ## 开始
 
@@ -24,3 +24,9 @@ Folio 是人与 Agent 共用的本地 Markdown 文档工作台。当前仓库为
 提交前运行 `npm run check`。影响打包、worker、CLI 或更新流程时，还需运行 `npm run pack` 验证实际应用包。自动化检查使用生成资料和模拟接口；真实账号的云测试须明确授权后单独执行。
 
 拉取请求请给出复现步骤、验证结果和必要的界面截图。截图使用合成资料，移除个人信息。
+
+## 贡献与署名
+
+提交贡献时，应有权提供相应代码与素材。按 [Apache-2.0 第 5 条](LICENSE) 明确提交供项目采用的贡献，除另有明确说明或书面约定外，适用相同许可。保留第三方代码原有版权和许可证；不要将第三方内容改标为 Folio 自有代码。
+
+应用、插件和独立 skill 的分发须保留 LICENSE 与 NOTICE。作者信息见 [AUTHORS.md](AUTHORS.md)，推荐引用格式见 [CITATION.cff](CITATION.cff)。

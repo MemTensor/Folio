@@ -1128,5 +1128,6 @@
   "连接并返回文档": "Connect and return to document",
   "连接并返回设置": "Connect and return to settings",
   "保存并返回文档": "Save and return to document",
-  "保存并返回设置": "Save and return to settings"
+  "保存并返回设置": "Save and return to settings",
+  "作者：{name}": "Author: {name}"
 }

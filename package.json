@@ -3,14 +3,14 @@
   "productName": "Folio",
   "version": "0.5.0-beta.22",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/MemTensor/Folio.git"
   },
   "type": "module",
   "description": "A local Markdown workspace for people and Agents.",
-  "author": "Folio contributors",
+  "author": "Zehao Lin",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -95,7 +95,11 @@
       "package.json",
       "README.md",
       "THIRD_PARTY_NOTICES.md",
-      "third-party-licenses/**/*"
+      "third-party-licenses/**/*",
+      "LICENSE",
+      "NOTICE",
+      "AUTHORS.md",
+      "CITATION.cff"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -144,6 +148,7 @@
           "build-info.json"
         ]
       }
-    ]
+    ],
+    "copyright": "Copyright © 2026 MemTensor"
   }
 }

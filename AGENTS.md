@@ -21,5 +21,7 @@ Folio is a local Markdown workspace for people and Agents. See `README.md`,
   output out of Git. Distributed plugins belong in `integrations/`.
 - Run relevant tests and `npm run check`. For packaging, worker or release changes,
   also run `npm run pack` and inspect the packaged result.
-- The repository is private and `UNLICENSED`. Do not make it public, grant a
-  license, or change published assets without explicit user authorization.
+- Folio is licensed under Apache-2.0 with NOTICE attribution to MemTensor and
+  Zehao Lin. Preserve these files in application, plugin and skill distributions.
+  The repository remains private. Do not change its visibility, license terms or
+  published assets without explicit user authorization.

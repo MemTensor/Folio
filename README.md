@@ -35,7 +35,7 @@
 
 界面支持简体中文与英语。按 **⌘ ,** 打开分类设置；从 **Folio → 检查更新** 或 **设置 → 关于与更新** 获取新版。
 
-> 当前为私有测试版，下载需要 [MemTensor/Folio](https://github.com/MemTensor/Folio) 的访问权限。安装包尚未完成 Developer ID 签名与 Apple 公证；项目标记为 `UNLICENSED`，未授予开源许可。安装与私有更新的准备步骤见 [更新说明](docs/更新说明.md)。
+> 当前为私有测试版，下载需要 [MemTensor/Folio](https://github.com/MemTensor/Folio) 的访问权限。安装包尚未完成 Developer ID 签名与 Apple 公证；当前源码采用 Apache-2.0；发行包的许可文件随包提供，既有 beta.22 安装包尚未包含本仓库新增的许可文件。安装与私有更新的准备步骤见 [更新说明](docs/更新说明.md)。
 
 ## 文档工作台
 
@@ -137,6 +137,16 @@ npm run desktop
 运行 `npm run check` 验证代码与桌面流程，`npm run pack` 构建应用，`npm run dist` 生成分发包。提交约定见 [参与开发](CONTRIBUTING.md)，安全问题见 [安全说明](SECURITY.md)。
 
 反馈问题时，可从 **设置 → 关于与更新** 或 Agent 设置复制、导出诊断信息。本地日志最多约 1 MB，保留运行事件和错误类别，不记录正文、对话、凭据或登录链接；导出不会自动发送。
+
+## 许可与署名
+
+Folio 自有源码和文档采用 **[Apache License 2.0](LICENSE)**。版权主体为 **MemTensor**，作者为 **Zehao Lin**，项目来源为 [MemTensor/Folio](https://github.com/MemTensor/Folio)。分发时须遵守许可证并保留相关版权及 [NOTICE](NOTICE) 署名信息。
+
+推荐引用：
+
+> Lin, Zehao. *Folio: A local Markdown workspace for people and Agents*. MemTensor. https://github.com/MemTensor/Folio
+
+引用时建议注明实际使用的版本或提交。机器可读格式见 [CITATION.cff](CITATION.cff)，作者信息见 [AUTHORS.md](AUTHORS.md)。第三方组件继续适用各自的许可证；Folio 不改变用户文档的版权或许可。
 
 ## 路线图
 
