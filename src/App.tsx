@@ -1,4 +1,11 @@
 import { scheduleBounded, cancelBounded } from './bounded-debounce.mjs';
+import {
+  collectImageImports,
+  imageReferences,
+  appendImageReferences,
+  readImageRecovery,
+  writeImageRecovery,
+} from './image-import.mjs';
 import { useDocumentAnalysis } from './use-document-analysis';
 import { ProjectHome, FirstRun } from './ProjectHome';
 import { t, getLocale, setLocale, subscribeLocale, localeTag, errorMessage } from './i18n';
@@ -510,12 +517,26 @@ export default function App() {
     queuedUpdateFiles = useRef(new Map<string, FileEvent>()),
     bootReported = useRef(false);
   const imageInput = useRef<HTMLInputElement>(null);
+  const [imageRecovery, setImageRecovery] = useState<ReturnType<typeof readImageRecovery>>(() =>
+    readImageRecovery(localStorage),
+  );
+  const imageRecoveryRef = useRef(imageRecovery);
+  imageRecoveryRef.current = imageRecovery;
+  const imageImportBusy = useRef(false);
+  const [recoveringImages, setRecoveringImages] = useState(false);
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null),
     [imageZoom, setImageZoom] = useState(100);
   const [notice, setNotice] = useState(''),
     [error, setError] = useState(''),
     [history, setHistory] = useState<HistoryMetadata[]>([]),
     [historySelected, setHistorySelected] = useState<HistoryEntry | null>(null);
+  useEffect(() => {
+    let retained = false;
+    try {
+      retained = writeImageRecovery(localStorage, imageRecovery);
+    } catch {}
+    if (!retained && imageRecovery) setError(t('图片引用暂无法保留到下次启动，请先复制引用。'));
+  }, [imageRecovery]);
   const [table, setTable] = useState<ReturnType<typeof beginRichEdit> | null>(null),
     [choices, setChoices] = useState<{
       input: ReturnType<typeof mergeInput>;
@@ -1313,36 +1334,95 @@ export default function App() {
   }
   async function addImages(files: File[]) {
     if (!doc || requireSourceInsertion()) return;
+    if (imageImportBusy.current) {
+      notify(t('图片正在导入，请稍候。'));
+      return;
+    }
+    if (imageRecoveryRef.current) {
+      notify(t('请先处理已导入的图片引用。'));
+      return;
+    }
     const target = activeRef.current,
-      view = editor.current?.view,
+      view = editor.current?.view;
+    if (!view || view.state.readOnly) {
+      notify(t('请先切换到写作或源码模式，再插入图片。'));
+      return;
+    }
+    const before = view.state.doc,
+      range = view.state.selection.main,
       content = docsRef.current[target]?.content;
     const stillCurrent = () =>
       activeRef.current === target &&
       editor.current?.view === view &&
-      docsRef.current[target]?.content === content;
-    const inserts: string[] = [];
-    for (const f of files) {
-      if (!stillCurrent()) return;
-      if (!f.type.startsWith('image/')) {
-        notify(t('拖入图片可插入到文档；打开文档请使用 ⌘ O。'));
-        continue;
-      }
-      const bytes = new Uint8Array(await f.arrayBuffer());
-      let binary = '';
-      for (let i = 0; i < bytes.length; i += 8192)
-        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-      const relative = await bridge.importImage({
-        path: target,
-        name: f.name,
-        data: btoa(binary),
+      view.state.doc === before &&
+      docsRef.current[target]?.content === content &&
+      !view.state.readOnly;
+    imageImportBusy.current = true;
+    try {
+      const result = await collectImageImports(files, {
+        isCurrent: stillCurrent,
+        importFile: async (file) => {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          if (!stillCurrent()) return '';
+          let binary = '';
+          for (let i = 0; i < bytes.length; i += 8192)
+            binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+          return bridge.importImage({ path: target, name: file.name, data: btoa(binary) });
+        },
       });
-      inserts.push(`![${f.name.replace(/\.[^.]+$/, '')}](${relative})\n`);
+      if (result.items.length) {
+        if (stillCurrent()) {
+          const text = imageReferences(result.items);
+          view.dispatch({
+            changes: { from: range.from, to: range.to, insert: text },
+            selection: { anchor: range.from + text.length },
+          });
+        } else {
+          const recovery = { path: target, items: result.items };
+          imageRecoveryRef.current = recovery;
+          setImageRecovery(recovery);
+        }
+      } else if (result.interrupted) notify(t('文档已变化，图片导入已停止。'));
+      if (result.failures.length) {
+        const details = result.failures
+          .slice(0, 3)
+          .map((f) => f.name.slice(0, 100) + ': ' + t(errorMessage(f.message)).slice(0, 160))
+          .join('；');
+        setError(
+          t('有 {count} 张图片未能导入。{details}', { count: result.failures.length, details }),
+        );
+      }
+    } finally {
+      imageImportBusy.current = false;
     }
-    if (!stillCurrent() || !view) {
-      notify(t('文档已变化，图片未插入。请在目标文档中重试。'));
-      return;
+  }
+  async function recoverImportedImages() {
+    const recovery = imageRecoveryRef.current;
+    if (!recovery || recoveringImages || table) return;
+    setRecoveringImages(true);
+    try {
+      if (!docsRef.current[recovery.path]) await bridge.libraryOpen(recovery.path);
+      await openFile(recovery.path);
+      if (!docsRef.current[recovery.path]) throw Error(t('请重新打开原文档后再插入图片。'));
+      updateDoc(recovery.path, (current) => ({
+        ...current,
+        content: appendImageReferences(current.content, recovery.items),
+        revision: current.revision + 1,
+      }));
+      schedule(recovery.path);
+      await flushDraft(recovery.path);
+      if (
+        recovery.items.every((item) =>
+          docsRef.current[recovery.path]?.content.includes(imageReferences([item]).trim()),
+        )
+      ) {
+        imageRecoveryRef.current = null;
+        setImageRecovery(null);
+      }
+      setShowHome(false);
+    } finally {
+      setRecoveringImages(false);
     }
-    insertText(view, inserts.join(''));
   }
   async function exportDoc(kind: 'html' | 'pdf' | 'docx') {
     if (!doc) return;
@@ -3103,6 +3183,47 @@ export default function App() {
           </div>
         </div>
       </div>
+      {imageRecovery && (
+        <section
+          className="sync-banner warning image-import-recovery"
+          role="status"
+          aria-label={t('已导入的图片引用')}
+        >
+          <span title={imageRecovery.path}>
+            {t('已复制 {count} 张图片到 {name}，尚未插入文档。', {
+              count: imageRecovery.items.length,
+              name: nameOf(imageRecovery.path),
+            })}
+          </span>
+          <button
+            disabled={recoveringImages}
+            onClick={() =>
+              guarded(async () => {
+                await bridge.copyText(imageReferences(imageRecovery.items));
+                notify(t('已复制图片引用。'));
+              })
+            }
+          >
+            {t('复制引用')}
+          </button>
+          <button
+            disabled={recoveringImages || !!table || closingWindow || installingUpdate}
+            onClick={() => guarded(recoverImportedImages)}
+          >
+            {t('插入原文档末尾')}
+          </button>
+          <IconButton
+            title={t('忽略引用，保留图片文件')}
+            disabled={recoveringImages}
+            onClick={() => {
+              imageRecoveryRef.current = null;
+              setImageRecovery(null);
+            }}
+          >
+            <X size={14} />
+          </IconButton>
+        </section>
+      )}
       <input
         type="file"
         ref={imageInput}

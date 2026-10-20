@@ -95,6 +95,7 @@ app.setName('Folio desktop verification');
 app.disableHardwareAcceleration();
 protocol.registerSchemesAsPrivileged([
   { scheme: 'folio', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  { scheme: 'folio-asset', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
 function finish(ok, details) {
@@ -354,15 +355,22 @@ async function run() {
     releaseResearch,
     imageStarted = false,
     releaseImage,
+    imageMode = 'hold-first',
+    imageCalls = 0,
     nativeRoot = workspace;
   const handlers = {
     'import-image': async (input) => {
       assert.equal(input.path, file);
-      imageStarted = true;
-      await new Promise((resolve) => {
-        releaseImage = resolve;
-      });
-      return 'assets/generated.png';
+      imageCalls++;
+      if (imageMode === 'hold-first' || (imageMode === 'hold-second' && imageCalls === 2)) {
+        imageStarted = true;
+        await new Promise((resolve) => {
+          releaseImage = resolve;
+        });
+      }
+      if (imageMode === 'fail-second' && imageCalls === 2)
+        throw Error('Generated image copy failure');
+      return 'assets/' + input.name;
     },
     close: () => {
       closes++;
@@ -638,6 +646,32 @@ async function run() {
       ),
     });
   });
+  const generatedAsset = (url) => {
+    const value = new URL(url);
+    return (
+      scenario === 'lifecycle' &&
+      value.protocol === 'folio-asset:' &&
+      value.hostname === 'local' &&
+      value.searchParams.get('document') === file &&
+      [
+        'assets/generated.png',
+        'assets/batch-one.png',
+        'assets/batch-two.png',
+        'assets/success.png',
+      ].includes(value.searchParams.get('path'))
+    );
+  };
+  protocol.handle('folio-asset', async (request) =>
+    generatedAsset(request.url)
+      ? new Response(
+          Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4ceIEAAS0AlkWLoFAAAAAAElFTkSuQmCC',
+            'base64',
+          ),
+          { headers: { 'Content-Type': 'image/png' } },
+        )
+      : new Response('Forbidden', { status: 403 }),
+  );
   session.defaultSession.webRequest.onBeforeRequest((request, callback) => {
     if (request.url === 'https://folio-image-test.invalid/image.png') {
       imageRequests++;
@@ -645,6 +679,7 @@ async function run() {
       return;
     }
     const allowed =
+      generatedAsset(request.url) ||
       request.url.startsWith('folio://app/') ||
       request.url.startsWith('data:') ||
       request.url.startsWith('blob:');
@@ -799,6 +834,13 @@ async function run() {
               },
               nativeRestored: () => nativeRoot === workspace,
               imageStarted: () => imageStarted,
+              configureImages: (mode) => {
+                imageMode = mode;
+                imageCalls = 0;
+                imageStarted = false;
+              },
+              imageCalls: () => imageCalls,
+              draft: (path) => drafts.get(path),
               releaseImage: () => releaseImage(),
               contextAction: (value) => {
                 contextAction = value;

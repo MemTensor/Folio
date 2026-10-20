@@ -84,6 +84,7 @@ test('private transport pins GitHub and strips debug output without exposing aut
   let observed;
   const source = new GitHubUpdateSource({
     ghBinary: '/generated/gh',
+    fetchImpl: async () => new Response('', { status: 404 }),
     spawnImpl: (binary, args, options) => {
       observed = { binary, args, options };
       const child = new EventEmitter();
@@ -118,7 +119,7 @@ test('public transport rejects redirected hosts and does not call private 404 up
     ghBinary: null,
     fetchImpl: async () => new Response('', { status: 404 }),
   });
-  await assert.rejects(privateRepo.listReleases(), { code: 'AUTH_REQUIRED' });
+  await assert.rejects(privateRepo.listReleases(), { code: 'NOT_FOUND' });
 });
 test('release pagination limits report incomplete instead of claiming current', async () => {
   const source = new GitHubUpdateSource({

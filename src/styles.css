@@ -2679,3 +2679,23 @@ kbd {
 .close-session-dialog > .field-error {
   margin: 16px 24px;
 }
+
+.image-import-recovery {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(760px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px #0002;
+  flex-wrap: wrap;
+}
+.image-import-recovery > span {
+  flex-basis: 250px;
+  overflow-wrap: anywhere;
+}
+.image-import-recovery ~ .toast {
+  bottom: 120px;
+}

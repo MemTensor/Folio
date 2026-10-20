@@ -3,8 +3,6 @@ module.exports = {
     'Cloud publication history has reached its limit. Resolve pending or old publication records first.',
   '文档在关闭期间发生变化，标签已保留。':
     'The document changed while closing. Its tab was kept open.',
-  '文档已变化，图片未插入。请在目标文档中重试。':
-    'The document changed, so the images were not inserted. Try again in the intended document.',
   '文件已保存，但无法将目标文件夹作为项目打开。':
     'The file was saved, but its folder could not be opened as a project.',
   '此模型支持图片输入，可按需查看文档渲染':
@@ -28,7 +26,6 @@ module.exports = {
   返回设置: 'Back to settings',
   关闭并返回设置: 'Close and return to settings',
   启用网络图片: 'Enable remote images',
-
   '复制内容无效或过长。': 'The text to copy is invalid or too large.',
   复制诊断信息: 'Copy diagnostics',
   '诊断信息已复制。': 'Diagnostics copied.',
@@ -109,7 +106,6 @@ module.exports = {
     'The agent tried to organize its changes, but they still overlap. Nothing was applied.',
   'Agent 已尝试修正，但回复仍不完整，尚未应用修改。':
     'The agent tried to correct its response, but it is still incomplete. Nothing was applied.',
-
   '参考了 {count} 份项目文档': 'Referenced {count} project {count|document|documents}',
   'API 回复未完成，请缩小范围后重试。':
     'The API reply did not finish. Narrow the request and try again.',
@@ -146,8 +142,6 @@ module.exports = {
   '请先完成更新下载。': 'Finish downloading the update first.',
   '更新未能完成，请重试。': 'The update could not be completed. Please try again.',
   '请先完成当前操作，再打开文档。': 'Finish the current operation before opening a document.',
-  '拖入图片可插入到文档；打开文档请使用 ⌘ O。':
-    'Drop images to insert them. Use ⌘ O to open a document.',
   '正在准备公式、图表和图片…': 'Preparing equations, diagrams, and images…',
   '已导出：': 'Exported: ',
   '文档已关闭，本次编辑尚未应用。': 'The document was closed. These edits have not been applied.',
@@ -702,8 +696,6 @@ module.exports = {
   '正在准备安装包，请稍候…': 'Preparing the update package. Please wait…',
   '草稿已保留，正在重新打开 Folio…': 'Drafts preserved. Reopening Folio…',
   '安装已取消，文档保持原样。': 'Installation canceled. Documents are unchanged.',
-  '暂时无法访问更新。私有测试版请先运行 gh auth login，并确认账号有仓库访问权限；若已登录，请稍后重试。':
-    'Updates are unavailable right now. For the private beta, run gh auth login and ensure your account has repository access. If already signed in, try again later.',
   '无法连接更新服务，请检查网络后重试。':
     'Could not connect to the update service. Check your connection and try again.',
   '更新来源无效。': 'Invalid update source.',
@@ -1201,14 +1193,8 @@ module.exports = {
     'The installation package failed security checks. The original application is unchanged. Download the update again; if it still fails, check the release page.',
   '更新安装助手未能启动或通过检查，原应用保持不变。请重新打开 Folio 后重试；若仍失败，请从发布页面手动安装。':
     'The update helper could not start or pass its checks. The original application is unchanged. Reopen Folio and try again; if it still fails, install the update manually from the release page.',
-};
-
-Object.assign(module.exports, {
   '请先单击内容进入编辑，再插入或设置格式。':
     'Click the content to edit it before inserting or formatting.',
-});
-
-Object.assign(module.exports, {
   '选区已变化，请重新选择文字。': 'The selection has changed. Select the text again.',
   '文档已变化，请重新生成修改建议。': 'The document has changed. Generate a new suggestion.',
   '登录地址无效，请更新 Codex CLI 后重试。':
@@ -1299,9 +1285,6 @@ Object.assign(module.exports, {
     'Your plan usage is currently unavailable. Try later or check your ChatGPT usage limits.',
   '登录已失效，请重新连接并登录 ChatGPT。':
     'Your sign-in has expired. Reconnect and sign in with ChatGPT again.',
-});
-
-Object.assign(module.exports, {
   'API 地址需要使用 HTTPS；本机服务可以使用 HTTP。':
     'Use an HTTPS API address. Local services may use HTTP.',
   'Agent 接入设置无效。': 'Invalid agent connection settings.',
@@ -1370,9 +1353,6 @@ Object.assign(module.exports, {
   '连接 API': 'Connect API',
   '使用兼容 API': 'Use a compatible API',
   'API 助手': 'API assistant',
-});
-
-Object.assign(module.exports, {
   '请在 Agent 设置中选择可用的轻量建议模型。':
     'Choose an available lightweight suggestion model in Agent settings.',
   '文档建议暂不可用，可以直接输入你的问题。':
@@ -1385,4 +1365,29 @@ Object.assign(module.exports, {
   轻量模型名称: 'Lightweight model name',
   '建议使用轻量模型生成；留空时不会调用更贵的模型。':
     'Use a lightweight model for suggestions. Leaving this blank will not call a more expensive model.',
-});
+  '更新请求过于频繁，请稍后重试，或从发布页面下载。':
+    'Too many update requests. Try again later or download from the release page.',
+  '更新访问验证失败，请稍后重试，或从发布页面下载。':
+    'Update access could not be verified. Try again later or download from the release page.',
+  '更新服务暂时拒绝访问，请稍后重试，或从发布页面下载。':
+    'The update service is temporarily refusing access. Try again later or download from the release page.',
+  '更新资源暂不可用，请稍后重试，或查看发布页面。':
+    'The update resource is unavailable. Try again later or check the release page.',
+  '一次最多导入 50 张图片。': 'Import up to 50 images at a time.',
+  '图片引用暂无法保留到下次启动，请先复制引用。':
+    'Image references could not be saved for next launch. Copy the references before closing.',
+  '图片正在导入，请稍候。': 'Images are being imported. Please wait.',
+  '请先处理已导入的图片引用。': 'Resolve the imported image references first.',
+  '请先切换到写作或源码模式，再插入图片。': 'Switch to Writing or Source before inserting images.',
+  '文档已变化，图片导入已停止。': 'The document changed. Image import was stopped.',
+  '有 {count} 张图片未能导入。{details}':
+    '{count} {count|image could|images could} not be imported. {details}',
+  '请重新打开原文档后再插入图片。': 'Reopen the original document before inserting the images.',
+  已导入的图片引用: 'Imported image references',
+  '已复制 {count} 张图片到 {name}，尚未插入文档。':
+    '{count} {count|image was|images were} copied for {name} and still need inserting.',
+  '已复制图片引用。': 'Image references copied.',
+  复制引用: 'Copy references',
+  插入原文档末尾: 'Append to original document',
+  '忽略引用，保留图片文件': 'Dismiss references and keep image files',
+};

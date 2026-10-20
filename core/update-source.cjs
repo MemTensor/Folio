@@ -19,13 +19,23 @@ async function findGh() {
     } catch {}
   return null;
 }
-function sourceError(status) {
-  if ([401, 403, 404].includes(status))
-    return new UpdateError(
-      'AUTH_REQUIRED',
-      '暂时无法访问更新。私有测试版请先运行 gh auth login，并确认账号有仓库访问权限；若已登录，请稍后重试。',
-    );
-  return new UpdateError('NETWORK', '无法连接更新服务，请检查网络后重试。');
+function sourceError(status, rateLimited = false) {
+  let code = 'NETWORK',
+    message = '无法连接更新服务，请检查网络后重试。';
+  if (status === 429 || rateLimited) {
+    code = 'RATE_LIMITED';
+    message = '更新请求过于频繁，请稍后重试，或从发布页面下载。';
+  } else if (status === 401) {
+    code = 'AUTH_REQUIRED';
+    message = '更新访问验证失败，请稍后重试，或从发布页面下载。';
+  } else if (status === 403) {
+    code = 'ACCESS_DENIED';
+    message = '更新服务暂时拒绝访问，请稍后重试，或从发布页面下载。';
+  } else if (status === 404) {
+    code = 'NOT_FOUND';
+    message = '更新资源暂不可用，请稍后重试，或查看发布页面。';
+  }
+  return Object.assign(new UpdateError(code, message), { httpStatus: status });
 }
 class GitHubUpdateSource {
   constructor({ fetchImpl = globalThis.fetch, ghBinary, spawnImpl = spawn } = {}) {
@@ -51,8 +61,7 @@ class GitHubUpdateSource {
     if (!endpoint.startsWith(`repos/${REPOSITORY}/releases`) || endpoint.includes('..'))
       throw new UpdateError('BAD_SOURCE', '更新来源无效。');
     if (signal?.aborted) throw abortError();
-    const gh = await this.binary();
-    if (signal?.aborted) throw abortError();
+    const deadline = Date.now() + timeout;
     let handle;
     if (destination) handle = await fs.open(destination, 'wx', 0o600);
     let received = 0;
@@ -65,13 +74,39 @@ class GitHubUpdateSource {
       onProgress?.(received);
     };
     try {
-      if (gh) await this.fromGh(gh, endpoint, { signal, timeout, binary, consume });
-      else await this.fromHttp(API + endpoint, { signal, timeout, binary, consume });
+      try {
+        // Public releases must not depend on a local CLI or its credentials.
+        await this.fromHttp(API + endpoint, { signal, timeout, binary, consume });
+      } catch (httpError) {
+        if (signal?.aborted) throw abortError();
+        const accessFailure = [401, 403, 404, 429].includes(httpError.httpStatus);
+        const networkFailure = !(httpError instanceof UpdateError) || httpError.code === 'NETWORK';
+        if (received || (!accessFailure && !networkFailure)) throw httpError;
+        if (networkFailure) httpError = sourceError(0);
+        const gh = await this.binary();
+        if (signal?.aborted) throw abortError();
+        const remaining = deadline - Date.now();
+        if (!gh || remaining <= 0) throw httpError;
+        try {
+          await this.fromGh(gh, endpoint, { signal, timeout: remaining, binary, consume });
+        } catch (ghError) {
+          if (
+            ['TOO_LARGE', 'BAD_SOURCE', 'CANCELED', 'ENOSPC', 'EACCES', 'EPERM'].includes(
+              ghError.code,
+            )
+          )
+            throw ghError;
+          // A failed optional login tool cannot turn a public access failure
+          // into a demand to log in, or expose its credential-bearing stderr.
+          throw httpError;
+        }
+      }
       if (handle) await handle.sync();
       return destination ? { bytes: received } : Buffer.concat(chunks);
     } catch (error) {
       if (signal?.aborted) throw abortError();
-      if (error instanceof UpdateError) throw error;
+      if (error instanceof UpdateError || ['ENOSPC', 'EACCES', 'EPERM'].includes(error.code))
+        throw error;
       throw sourceError(0);
     } finally {
       await handle?.close();
@@ -140,10 +175,15 @@ class GitHubUpdateSource {
       if (childError)
         throw new UpdateError('AUTH_REQUIRED', '无法运行 GitHub 登录工具，请检查 gh 安装后重试。');
       if (code !== 0)
-        throw sourceError(/401|403|404|auth login|authentication/i.test(stderr) ? 403 : 0);
+        throw sourceError(
+          Number(/HTTP[ (:]*(401|403|404|429)/i.exec(stderr)?.[1]) ||
+            (/auth login|authentication/i.test(stderr) ? 401 : 0),
+        );
     } catch (e) {
       stop();
       await finish;
+      if (signal?.aborted) throw abortError();
+      if (timedOut) throw new UpdateError('TIMEOUT', '更新服务响应超时，请重试。');
       throw e;
     } finally {
       clearTimeout(timer);
@@ -178,6 +218,7 @@ class GitHubUpdateSource {
             Accept: binary ? 'application/octet-stream' : 'application/vnd.github+json',
             'User-Agent': 'Folio-Update',
           },
+          credentials: 'omit',
           redirect: 'manual',
           signal: controller.signal,
         });
@@ -188,7 +229,15 @@ class GitHubUpdateSource {
         url = new URL(location, url).href;
         response = null;
       }
-      if (!response?.ok) throw sourceError(response?.status);
+      if (!response?.ok) {
+        await response?.body?.cancel().catch(() => {});
+        throw sourceError(
+          response?.status,
+          response?.status === 403 &&
+            (response.headers.get('x-ratelimit-remaining') === '0' ||
+              response.headers.has('retry-after')),
+        );
+      }
       if (!response.body) throw sourceError(0);
       const reader = response.body.getReader();
       try {

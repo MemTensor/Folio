@@ -13,16 +13,23 @@ const path = require('node:path');
   assert.equal(RELEASE_PAGE, `https://github.com/${expected}/releases`);
   const requests = [];
   const source = new GitHubUpdateSource({
-    ghBinary: null,
-    fetchImpl: async (url) => {
+    ghBinary: '/generated/expired-gh',
+    spawnImpl: () => {
+      throw Error('Public updates must not invoke gh.');
+    },
+    fetchImpl: async (url, options) => {
       requests.push(url);
-      return new Response('[]');
+      assert.equal(options.headers.Authorization, undefined);
+      return new Response(url.includes('/assets/') ? 'generated package update' : '[]');
     },
   });
   assert.deepEqual(await source.listReleases(), []);
   assert.deepEqual(requests, [
     `https://api.github.com/repos/${expected}/releases?per_page=25&page=1`,
   ]);
+  const bytes = await source.asset({ id: 23, size: Buffer.byteLength('generated package update') });
+  assert.equal(bytes.toString(), 'generated package update');
+  assert.equal(requests.at(-1), `https://api.github.com/repos/${expected}/releases/assets/23`);
   await assert.rejects(source.request('repos/glin93/folio/releases'), { code: 'BAD_SOURCE' });
   const { contextItems, popupContext } = require(path.join(resource, 'electron/context-menu.cjs'));
   assert.equal(typeof popupContext, 'function');

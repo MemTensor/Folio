@@ -25,7 +25,7 @@
 
 ## 开始使用
 
-**[下载 Folio v0.5.0-beta.23 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.23/Folio-0.5.0-beta.23-arm64-mac.zip)** · [更新记录](CHANGELOG.md)
+**[下载 Folio v0.5.0-beta.24 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.24/Folio-0.5.0-beta.24-arm64-mac.zip)** · [更新记录](CHANGELOG.md)
 
 解压后将 `Folio.app` 放入“应用程序”文件夹。
 

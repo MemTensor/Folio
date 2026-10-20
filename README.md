@@ -18,7 +18,7 @@ Plans, experiment notes and technical proposals may come from you, Claude Code, 
 
 ## Get started
 
-**[Download Folio v0.5.0-beta.23 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.23/Folio-0.5.0-beta.23-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
+**[Download Folio v0.5.0-beta.24 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.24/Folio-0.5.0-beta.24-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
 
 Unzip the download and move `Folio.app` to Applications.
 
