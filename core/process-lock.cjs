@@ -88,7 +88,18 @@ async function withProcessLock(directory, key, fn, timeout) {
     return await fn(token);
   } finally {
     await retry(() => {
-      database(directory).prepare('DELETE FROM leases WHERE key=? AND token=?').run(key, token);
+      const db = database(directory);
+      try {
+        db.prepare('DELETE FROM leases WHERE key=? AND token=?').run(key, token);
+      } finally {
+        // Windows cannot remove or replace state directories with cached SQLite
+        // handles open. Lease ownership lives in SQLite, not in this connection;
+        // all statements here are synchronous, so other operations reopen safely.
+        if (process.platform === 'win32') {
+          db.close();
+          databases.delete(directory);
+        }
+      }
       return true;
     }, Date.now() + timeout);
   }
