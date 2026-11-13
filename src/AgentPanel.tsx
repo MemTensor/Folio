@@ -52,7 +52,7 @@ interface Props {
   onOpenReference: (path: string) => void;
   disabled: boolean;
 }
-const nameOf = (path: string) => path.split('/').pop() || path;
+const nameOf = (path: string) => path.split(/[\\/]/).pop() || path;
 const effortLabel = (value: string) =>
   t(
     (

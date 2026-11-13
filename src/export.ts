@@ -20,6 +20,6 @@ export async function exportHTML(content: string, path: string) {
   return {
     diagrams,
     maths,
-    html: `<!doctype html><html lang="${localeTag()}"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><title>${escapeHTML(path.split('/').pop() || documentText('文档', 'Document'))}</title><style>${style}</style></head><body>${body.innerHTML}</body></html>`,
+    html: `<!doctype html><html lang="${localeTag()}"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><title>${escapeHTML(path.split(/[\\/]/).pop() || documentText('文档', 'Document'))}</title><style>${style}</style></head><body>${body.innerHTML}</body></html>`,
   };
 }

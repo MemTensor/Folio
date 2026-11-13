@@ -128,7 +128,7 @@ export function DocumentLibrary({
           {data.projects.map((p) => (
             <option key={p.id} value={p.id}>
               {data.projects.filter((other) => other.name === p.name).length > 1
-                ? p.root.split('/').slice(-2).join('/')
+                ? p.root.split(/[\\/]/).slice(-2).join('/')
                 : p.name}
             </option>
           ))}

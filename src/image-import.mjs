@@ -1,3 +1,4 @@
+import { isAbsoluteLocalPath } from './local-path.mjs';
 const STORAGE_KEY = 'folio-image-import-recovery';
 const MAX_IMAGES = 50;
 /** @typedef {{name:string,relative:string}} ImportedImage */
@@ -62,8 +63,7 @@ export function readImageRecovery(storage) {
     if (!raw || raw.length > 65536) return null;
     const value = JSON.parse(raw);
     if (
-      typeof value?.path !== 'string' ||
-      !value.path.startsWith('/') ||
+      !isAbsoluteLocalPath(value?.path) ||
       value.path.length > 4096 ||
       !Array.isArray(value.items) ||
       !value.items.length ||

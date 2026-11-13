@@ -142,7 +142,7 @@ interface Doc {
   error?: string;
   restorePending?: boolean;
 }
-const nameOf = (p: string) => p.split('/').pop() || p;
+const nameOf = (p: string) => p.split(/[\\/]/).pop() || p;
 const flatten = (nodes: TreeNode[]): TreeNode[] =>
   nodes.flatMap((n) => (n.kind === 'file' ? [n] : flatten(n.children || [])));
 const time = (v: number) =>
@@ -2079,7 +2079,7 @@ export default function App() {
   }
 
   async function renameDocument(p: string, name: string) {
-    const target = p.slice(0, p.lastIndexOf('/') + 1) + name;
+    const target = p.slice(0, Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1) + name;
     if (target !== p && docsRef.current[target]) throw Error(t('同名文件已存在。'));
     const locked = p === activeRef.current ? editor.current : null;
     const validate = () => {

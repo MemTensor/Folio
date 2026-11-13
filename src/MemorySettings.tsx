@@ -97,7 +97,7 @@ export function MemorySettings({ workspace }: { workspace: string }) {
       <section>
         <h3>{t('当前项目的知识库')}</h3>
         <div className="memory-workspace" title={workspace}>
-          {workspace ? workspace.split('/').pop() : t('请先打开项目文件夹')}
+          {workspace ? workspace.split(/[\\/]/).pop() : t('请先打开项目文件夹')}
         </div>
         <select
           aria-label={t('当前项目知识库')}

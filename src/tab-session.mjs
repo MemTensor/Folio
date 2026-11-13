@@ -1,3 +1,4 @@
+import { isAbsoluteLocalPath } from './local-path.mjs';
 const key = 'folio-tab-session';
 const legacyKey = 'folio-open-tabs';
 
@@ -7,13 +8,7 @@ export function restoreTabsPreference(value) {
 }
 
 function paths(value) {
-  return Array.isArray(value)
-    ? [
-        ...new Set(
-          value.filter((p) => typeof p === 'string' && p.startsWith('/') && !p.includes('\0')),
-        ),
-      ]
-    : [];
+  return Array.isArray(value) ? [...new Set(value.filter((p) => isAbsoluteLocalPath(p)))] : [];
 }
 
 /** A null session means first launch; an empty session means explicitly closed tabs. */

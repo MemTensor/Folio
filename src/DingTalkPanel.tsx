@@ -278,7 +278,7 @@ export function DingTalkPanel({ path }: { path: string }) {
       <p className="dingtalk-intro">
         {t('把当前文档发布到钉钉，与同事直接阅读和编辑。再次发布会更新同一篇在线文档。')}
       </p>
-      <div className="dingtalk-file">{path.split('/').pop()}</div>
+      <div className="dingtalk-file">{path.split(/[\\/]/).pop()}</div>
       <label>
         {t('钉钉账号')}
         <select
