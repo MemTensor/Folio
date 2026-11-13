@@ -254,3 +254,17 @@ test('native window close consults the renderer for clean tabs, while confirmed 
     assert.deepEqual(events, expected);
   }
 });
+
+test('Windows drive and UNC paths retain tab order and the active document', () => {
+  const state = storage();
+  const files = ['C:\\工作\\记录.md', 'D:/Project/Notes.md', '\\\\server\\share\\Notes.md'];
+  writeTabSession(
+    state,
+    [...files, 'C:relative.md', 'https://example.com/a.md', 'C:\\bad\0.md'],
+    files[1],
+    true,
+  );
+  const session = readTabSession(state);
+  assert.deepEqual(startupTabs(session, 'always'), files);
+  assert.equal(session.active, files[1]);
+});

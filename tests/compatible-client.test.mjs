@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -12,7 +13,7 @@ const cryptoFixture = {
   decrypt: async (value) => Buffer.from(value, 'base64').toString().split('').reverse().join(''),
 };
 async function settingsFixture(t) {
-  const dataDir = await mkdtemp('/private/tmp/folio-api-');
+  const dataDir = await mkdtemp(`${fixtureTmpdir()}/folio-api-`);
   t.after(() => rm(dataDir, { recursive: true, force: true }));
   return { settings: new AgentSettings(dataDir, cryptoFixture), dataDir };
 }

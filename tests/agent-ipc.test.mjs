@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
@@ -7,7 +8,7 @@ const { registerAgent } = require('../electron/agent.cjs');
 const { Workspaces } = require('../core/workspaces.cjs');
 
 test('Agent IPC resolves its project from the document and rejects other projects, secrets and escaped symlinks', async (t) => {
-  const dir = await mkdtemp('/private/tmp/folio-agent-ipc-');
+  const dir = await mkdtemp(`${fixtureTmpdir()}/folio-agent-ipc-`);
   t.after(() => rm(dir, { recursive: true, force: true }));
   const a = dir + '/a',
     b = dir + '/b',

@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -7,7 +8,7 @@ import { createRequire } from 'node:module';
 const { CodexClient } = createRequire(import.meta.url)('../core/codex-client.cjs');
 
 async function fixture(t, options = {}) {
-  const directory = await mkdtemp('/private/tmp/folio-codex-test-');
+  const directory = await mkdtemp(`${fixtureTmpdir()}/folio-codex-test-`);
   t.after(() => rm(directory, { recursive: true, force: true }));
   const child = new EventEmitter();
   Object.assign(child, {
@@ -181,7 +182,7 @@ test('only dynamic document calls reach the owner; approvals and requests after 
 });
 
 test('closing before runtime resolution prevents a late child spawn', async (t) => {
-  const directory = await mkdtemp('/private/tmp/folio-codex-close-');
+  const directory = await mkdtemp(`${fixtureTmpdir()}/folio-codex-close-`);
   t.after(() => rm(directory, { recursive: true, force: true }));
   let spawns = 0;
   const client = new CodexClient({

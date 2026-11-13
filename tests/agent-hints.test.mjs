@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -12,7 +13,7 @@ async function until(check) {
   throw Error('Hint test timed out');
 }
 async function fixture(t) {
-  const dataDir = await mkdtemp('/private/tmp/folio-hints-');
+  const dataDir = await mkdtemp(`${fixtureTmpdir()}/folio-hints-`);
   t.after(() => rm(dataDir, { recursive: true, force: true }));
   const calls = [],
     events = [];

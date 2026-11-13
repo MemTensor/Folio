@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -53,7 +54,7 @@ test('100 discovered task folders do not displace intentionally opened projects'
 test('temporary classification uses path boundaries and explicit pins can override it', () => {
   const examples = [
     '/tmp/project',
-    '/private/tmp/project',
+    `${fixtureTmpdir()}/project`,
     '/var/folders/abc/task',
     '/Users/person/.codex/worktrees/abcd/project',
     '/Users/person/.claude/worktrees/task/project',

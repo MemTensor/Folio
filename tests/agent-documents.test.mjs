@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, symlink, rm, readFile } from 'node:fs/promises';
@@ -7,7 +8,7 @@ const { AgentDocuments } = require('../core/agent-documents.cjs');
 const { FileStore } = require('../core/file-store.cjs');
 
 async function fixture(t) {
-  const directory = await mkdtemp('/private/tmp/folio-document-tools-');
+  const directory = await mkdtemp(`${fixtureTmpdir()}/folio-document-tools-`);
   t.after(() => rm(directory, { recursive: true, force: true }));
   const root = directory + '/project';
   await mkdir(root + '/docs', { recursive: true });

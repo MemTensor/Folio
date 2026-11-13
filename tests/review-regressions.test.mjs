@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -24,7 +25,7 @@ const deferred = () => {
   return { promise, resolve };
 };
 async function fixture(t) {
-  const dir = await fs.realpath(await fs.mkdtemp('/private/tmp/folio-regressions-'));
+  const dir = await fs.realpath(await fs.mkdtemp(`${fixtureTmpdir()}/folio-regressions-`));
   const root = path.join(dir, 'project'),
     state = path.join(dir, 'state');
   await fs.mkdir(root);

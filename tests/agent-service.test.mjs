@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -13,7 +14,7 @@ async function until(check) {
   throw Error('Agent test timed out.');
 }
 async function fixture(t, options = {}) {
-  const directory = await mkdtemp('/private/tmp/folio-agent-service-');
+  const directory = await mkdtemp(`${fixtureTmpdir()}/folio-agent-service-`);
   t.after(() => rm(directory, { recursive: true, force: true }));
   const client = new EventEmitter();
   Object.assign(client, {
