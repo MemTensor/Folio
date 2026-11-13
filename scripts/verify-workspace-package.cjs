@@ -6,25 +6,45 @@ const os = require('node:os');
 const path = require('node:path');
 (async () => {
   const bundle = process.argv[2];
-  if (!bundle || !path.isAbsolute(bundle) || !bundle.endsWith('.app'))
-    throw Error('Pass an absolute Folio.app path.');
+  if (!bundle || !path.isAbsolute(bundle))
+    throw Error('Pass an absolute application bundle directory.');
   const { WorkspaceBrowser } = require(
-    path.join(bundle, 'Contents/Resources/app.asar/core/workspace-browser.cjs'),
+    path.join(
+      bundle,
+      (process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar') +
+        '/core/workspace-browser.cjs',
+    ),
   );
   const { WorkspaceSession } = require(
-    path.join(bundle, 'Contents/Resources/app.asar/core/workspace-session.cjs'),
+    path.join(
+      bundle,
+      (process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar') +
+        '/core/workspace-session.cjs',
+    ),
   );
   const { DocumentCatalog } = require(
-    path.join(bundle, 'Contents/Resources/app.asar/core/document-catalog.cjs'),
+    path.join(
+      bundle,
+      (process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar') +
+        '/core/document-catalog.cjs',
+    ),
   );
   const temporary = await fs.realpath(
     await fs.mkdtemp(path.join(os.tmpdir(), 'folio-package-folders-')),
   );
   const { DocumentLibrary } = require(
-    path.join(bundle, 'Contents/Resources/app.asar/core/library.cjs'),
+    path.join(
+      bundle,
+      (process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar') +
+        '/core/library.cjs',
+    ),
   );
   const { DocumentSearch } = require(
-    path.join(bundle, 'Contents/Resources/app.asar/core/document-search.cjs'),
+    path.join(
+      bundle,
+      (process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar') +
+        '/core/document-search.cjs',
+    ),
   );
   const documentSearch = new DocumentSearch();
   const library = new DocumentLibrary(path.join(temporary, 'library-state'));

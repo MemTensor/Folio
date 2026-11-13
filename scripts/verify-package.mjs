@@ -12,8 +12,17 @@ const root = path.resolve(import.meta.dirname, '..');
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const { version } = pkg;
 const bundle =
-  process.argv[2] || path.join(buildPaths.buildOutput(root, pkg), 'mac-arm64', 'Folio.app');
-const electron = path.join(bundle, 'Contents/MacOS/Folio');
+  process.argv[2] ||
+  path.join(
+    buildPaths.buildOutput(root, pkg),
+    ...(process.platform === 'win32'
+      ? ['win-unpacked']
+      : [process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Folio.app']),
+  );
+const electron = path.join(
+  bundle,
+  process.platform === 'win32' ? 'Folio.exe' : 'Contents/MacOS/Folio',
+);
 
 function run(args, { cwd = root } = {}) {
   return new Promise((resolve) => {
@@ -51,7 +60,13 @@ if (update.code !== 0 || !update.out.includes('"ok":true'))
 
 // The bundled CLI runs through ELECTRON_RUN_AS_NODE, so this also confirms the
 // runAsNode fuse is still on after the fuse flip.
-const cli = await run([path.join(bundle, 'Contents/Resources/cli/folio.cjs'), '--version']);
+const cli = await run([
+  path.join(
+    bundle,
+    process.platform === 'win32' ? 'resources/cli/folio.cjs' : 'Contents/Resources/cli/folio.cjs',
+  ),
+  '--version',
+]);
 if (cli.code !== 0 || !cli.out.includes(version))
   throw Error('Bundled CLI failed inside the package: ' + (cli.err || cli.out));
 

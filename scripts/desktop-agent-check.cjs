@@ -43,6 +43,7 @@ async function verifyAgentPanel(window, original, capturePath, language, fixture
       .getBoundingClientRect();
     return { x, y, width, height };
   };
+  const originalWindowSize = window.getSize();
   const collapsedToolbar = await evaluate(toolbarBounds);
   await clickLabel(labels.open);
   await wait(() => !!document.querySelector('.folio-agent .agent-connect-card'));
@@ -121,7 +122,7 @@ async function verifyAgentPanel(window, original, capturePath, language, fixture
       !!document.querySelector('.agent-api-settings') &&
       !document.querySelectorAll('.agent-provider-options button')[1].disabled,
   );
-  assert.equal(await evaluate(() => document.activeElement?.dataset.agentSetting), 'baseURL');
+  await wait(() => document.activeElement?.dataset.agentSetting === 'baseURL');
   await evaluate(() => {
     const field = document.querySelector('[data-agent-setting="model"]');
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(
@@ -404,8 +405,11 @@ async function verifyAgentPanel(window, original, capturePath, language, fixture
       { flag: 'wx' },
     );
   }
-  window.setSize(1200, 850);
+  window.setSize(...originalWindowSize);
   await pause();
+  // Windows may clamp a resized window to the display work area. Compare
+  // panel transitions at the restored viewport, not across native resizing.
+  const restoredToolbar = await evaluate(toolbarBounds);
   if (capturePath) {
     await evaluate(() => {
       document.documentElement.dataset.theme = 'sepia';
@@ -439,7 +443,7 @@ async function verifyAgentPanel(window, original, capturePath, language, fixture
   };
   await clickDocumentAction(en ? 'Review changes' : '改动审阅');
   await wait(() => !!document.querySelector('.review-panel'));
-  assert.deepEqual(await evaluate(toolbarBounds), collapsedToolbar);
+  assert.deepEqual(await evaluate(toolbarBounds), restoredToolbar);
   await clickDocumentAction(en ? 'Version history' : '历史版本');
   await wait(() => !!document.querySelector('.history-panel'));
   await clickDocumentAction(en ? 'Publish or sync to DingTalk' : '发布或同步到钉钉');

@@ -2,7 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const resources = path.join(process.argv[2], 'Contents/Resources');
+const resources = path.join(
+  process.argv[2],
+  process.platform === 'win32' ? 'resources' : 'Contents/Resources',
+);
 const asar = path.join(resources, 'app.asar');
 for (const file of ['LICENSE', 'NOTICE', 'AUTHORS.md', 'CITATION.cff']) {
   assert.equal(

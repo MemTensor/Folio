@@ -6,7 +6,10 @@ const { EventEmitter } = require('node:events');
 
 async function run() {
   const bundle = path.resolve(process.argv[2]);
-  const asar = path.join(bundle, 'Contents/Resources/app.asar');
+  const asar = path.join(
+    bundle,
+    process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar',
+  );
   const { AgentService } = require(path.join(asar, 'core/agent-service.cjs'));
   assert.equal(typeof require(path.join(asar, 'electron/agent.cjs')).registerAgent, 'function');
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'folio-agent-package-'));
@@ -69,7 +72,11 @@ async function run() {
     assert.equal(session.messages.at(-1).status, 'completed');
     assert.equal(session.messages.at(-1).edits[0].after, 'Revised sentence.');
     const { Diagnostics } = require(
-      path.join(bundle, 'Contents/Resources/app.asar/core/diagnostics.cjs'),
+      path.join(
+        bundle,
+        (process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar') +
+          '/core/diagnostics.cjs',
+      ),
     );
     const diagnostics = new Diagnostics(temporary, { version: '0.5.0-beta.16' });
     diagnostics.record('login', {

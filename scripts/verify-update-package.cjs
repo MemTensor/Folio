@@ -4,9 +4,12 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 (async () => {
   const [bundle, expected] = process.argv.slice(2);
-  assert(path.isAbsolute(bundle) && bundle.endsWith('.app'));
+  assert(path.isAbsolute(bundle));
   assert.equal(expected, 'MemTensor/Folio');
-  const resource = path.join(bundle, 'Contents/Resources/app.asar');
+  const resource = path.join(
+    bundle,
+    process.platform === 'win32' ? 'resources/app.asar' : 'Contents/Resources/app.asar',
+  );
   const { REPOSITORY, RELEASE_PAGE } = require(path.join(resource, 'core/update-release.cjs'));
   const { GitHubUpdateSource } = require(path.join(resource, 'core/update-source.cjs'));
   assert.equal(REPOSITORY, expected);

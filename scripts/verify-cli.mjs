@@ -30,10 +30,30 @@ globalThis.fetch = deny;
 globalThis.WebSocket = deny;
 require('node:net').Socket.prototype.connect = deny;
 require('node:dgram').createSocket = deny;
+// Only the generated DingTalk fixture is mocked; all other child processes
+// (including the bundled indexing worker) retain their real implementation.
+const cp = require('node:child_process');
+const originalSpawn = cp.spawn;
+cp.spawn = function(binary, args, options) {
+  if (binary !== process.env.FOLIO_DWS_BIN) return originalSpawn(binary, args, options);
+  const { PassThrough } = require('node:stream');
+  const child = new (require('node:events').EventEmitter)();
+  child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+  child.kill = () => true;
+  process.nextTick(() => {
+    if (args.join(' ') !== 'profile list --format json') return child.emit('close', 99);
+    child.stdout.end(JSON.stringify({ profiles: [{profile: 'fixture:user', isOrgCurrent: true}], currentProfile: 'fixture:user' }));
+    child.emit('close', 0);
+  });
+  return child;
+};
 `,
   );
   const env = {
-    PATH: '/usr/bin:/bin',
+    PATH: path.dirname(process.execPath),
+    SystemRoot: process.env.SystemRoot,
+    TEMP: temporary,
+    TMP: temporary,
     NODE_PATH: '',
     FOLIO_DATA_DIR: path.join(temporary, 'state'),
     FOLIO_DWS_BIN: fakeDws,

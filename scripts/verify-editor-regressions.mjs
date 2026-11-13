@@ -1,3 +1,4 @@
+import { tmpdir as fixtureTmpdir } from 'node:os';
 import { build } from 'esbuild';
 import { mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
@@ -5,7 +6,7 @@ import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
-const directory = await realpath(await mkdtemp('/private/tmp/folio-editor-regression-'));
+const directory = await realpath(await mkdtemp(`${fixtureTmpdir()}/folio-editor-regression-`));
 try {
   await build({
     entryPoints: [path.join(root, 'scripts/editor-regression-fixture.ts')],
@@ -19,7 +20,7 @@ try {
         setup(builder) {
           // Full MathJax/Mermaid rendering is covered by verify-desktop. This suite
           // inspects StateField work and copy DOM without constructing a live view.
-          builder.onLoad({ filter: /\/src\/mathjax\.ts$/ }, () => ({
+          builder.onLoad({ filter: /[\\/]src[\\/]mathjax\.ts$/ }, () => ({
             contents: 'export async function typesetMath() {}',
             loader: 'js',
           }));
