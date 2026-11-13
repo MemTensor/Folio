@@ -25,17 +25,22 @@
 
 ## 开始使用
 
-**[下载 Folio v0.5.0-beta.24 · macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.24/Folio-0.5.0-beta.24-arm64-mac.zip)** · [更新记录](CHANGELOG.md)
+| 平台 | 下载 | 安装方式 |
+| --- | --- | --- |
+| Windows x64 · 实验测试版 beta.25 | [下载安装程序（.exe）](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.25/Folio-0.5.0-beta.25-windows-x64-setup.exe) | 运行安装程序，选择目录并完成安装向导。 |
+| macOS Apple Silicon · beta.24 | [下载应用（.zip）](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.25/Folio-0.5.0-beta.24-arm64-mac.zip) | 解压后将 `Folio.app` 放入“应用程序”文件夹。 |
 
-解压后将 `Folio.app` 放入“应用程序”文件夹。
+[更新记录](CHANGELOG.md) · [下载最新版本](https://github.com/MemTensor/Folio/releases/latest)
+
+**Windows 版处于早期测试阶段。** 尚未完成完整兼容性验证，安装时 Windows 可能提示未知发布者。macOS 下载仍为现有的 beta.24，Mac 用户无需为本次发布重新安装。
 
 1. **打开文档或项目**：直接打开 `.md` 文件，或选择项目文件夹；常用项目可以置顶。
 2. **阅读并继续写作**：在写作、源码和阅读模式之间切换，按需编辑公式、图表和表格。
 3. **与 Agent 协作**：连接模型后，在文档旁提问或描述修改要求，审阅后再应用。
 
-界面支持简体中文与英语。按 **⌘ ,** 打开分类设置；从 **Folio → 检查更新** 或 **设置 → 关于与更新** 获取新版。
+界面支持简体中文与英语，点击设置按钮可打开分类设置。macOS 支持 **⌘ ,**，可从 **Folio → 检查更新** 或 **设置 → 关于与更新** 获取新版。Windows 暂未启用应用内自动更新，通过运行新版安装包升级。
 
-> macOS Apple Silicon 测试版；安装包尚未完成 Developer ID 签名与 Apple 公证。安装与许可范围见 [更新说明](docs/更新说明.md) 和 [分发说明](docs/开源与分发说明.md)。
+> Windows 代码签名、macOS Developer ID 签名与 Apple 公证尚未完成。安装与许可范围见 [更新说明](docs/更新说明.md) 和 [分发说明](docs/开源与分发说明.md)。
 
 ## 文档工作台
 
@@ -124,7 +129,7 @@
 | [开发指南](docs/开发指南.md) | 环境、检查、构建与发布 |
 | [第三方组件](THIRD_PARTY_NOTICES.md) | 依赖与授权说明 |
 
-从源码运行需要 macOS Apple Silicon、Node.js 22.13+、npm 和仓库访问权限：
+从源码运行需要 macOS Apple Silicon 或 Windows x64、Node.js 22.13+、npm 和仓库访问权限：
 
 ```bash
 git clone https://github.com/MemTensor/Folio.git
@@ -134,7 +139,7 @@ node node_modules/electron/install.js
 npm run desktop
 ```
 
-运行 `npm run check` 验证代码与桌面流程，`npm run pack` 构建应用，`npm run dist` 生成分发包。提交约定见 [参与开发](CONTRIBUTING.md)，安全问题见 [安全说明](SECURITY.md)。
+运行 `npm run check` 验证代码与桌面流程，`npm run pack` 构建应用，`npm run dist` 生成 macOS ZIP 或 Windows 安装程序。提交约定见 [参与开发](CONTRIBUTING.md)，安全问题见 [安全说明](SECURITY.md)。
 
 反馈问题时，可从 **设置 → 关于与更新** 或 Agent 设置复制、导出诊断信息。本地日志最多约 1 MB，保留运行事件和错误类别，不记录正文、对话、凭据或登录链接；导出不会自动发送。
 
@@ -148,4 +153,5 @@ npm run desktop
 
 - 多窗口与跨会话阅读位置恢复。
 - 跨文件引用、反向链接和相关文档导航。
-- Developer ID 签名、公证与更多平台支持。
+- 代码签名、Apple 公证、Windows 更新支持及更多平台验证。
+

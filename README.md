@@ -18,17 +18,22 @@ Plans, experiment notes and technical proposals may come from you, Claude Code, 
 
 ## Get started
 
-**[Download Folio v0.5.0-beta.24 for macOS Apple Silicon](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.24/Folio-0.5.0-beta.24-arm64-mac.zip)** · [Release notes](CHANGELOG.md)
+| Platform | Download | Installation |
+| --- | --- | --- |
+| Windows x64 · experimental beta.25 | [Download installer (.exe)](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.25/Folio-0.5.0-beta.25-windows-x64-setup.exe) | Run the installer, choose a directory and follow the wizard. |
+| macOS Apple Silicon · beta.24 | [Download app (.zip)](https://github.com/MemTensor/Folio/releases/download/v0.5.0-beta.25/Folio-0.5.0-beta.24-arm64-mac.zip) | Unzip and move `Folio.app` to Applications. |
 
-Unzip the download and move `Folio.app` to Applications.
+[Release notes](CHANGELOG.md) · [Latest downloads](https://github.com/MemTensor/Folio/releases/latest)
+
+**Windows is an early test version.** Compatibility testing is still in progress, and Windows may show an unknown-publisher warning during installation. The macOS download is the existing beta.24 app; Mac users do not need to reinstall it for this release.
 
 1. **Open a document or project:** open a `.md` file or choose a project folder. Pin projects you use often.
 2. **Read and write:** switch between writing, source and reading views; open dedicated equation, diagram and table editors when needed.
 3. **Work with Agent:** connect a model, ask questions or request changes beside the document, then review edits before applying them.
 
-The interface supports Simplified Chinese and English. Press **⌘ ,** for categorized settings. Find updates through **Folio → Check for updates** or **Settings → About and updates**.
+The interface supports Simplified Chinese and English. Open categorized settings with the settings button. On macOS, press **⌘ ,** and find updates through **Folio → Check for updates** or **Settings → About and updates**. On Windows, run a newer installer to upgrade; in-app updates are not enabled.
 
-> Beta for macOS Apple Silicon. Developer ID signing and Apple notarization are pending. See [installation and updates](docs/更新说明.md) and [distribution details](docs/开源与分发说明.md).
+> Windows code signing, macOS Developer ID signing and Apple notarization are pending. See [installation and updates](docs/更新说明.md) and [distribution details](docs/开源与分发说明.md).
 
 ## Document workspace
 
@@ -117,7 +122,7 @@ Enable each feature separately. MemOS helps later tasks find source documents; l
 | [Development guide](docs/开发指南.md) | Setup, checks, packaging and releases |
 | [Third-party notices](THIRD_PARTY_NOTICES.md) | Dependencies and licenses |
 
-Run from source with macOS Apple Silicon, Node.js 22.13+, npm and repository access:
+Run from source with macOS Apple Silicon or Windows x64, Node.js 22.13+, npm and repository access:
 
 ```bash
 git clone https://github.com/MemTensor/Folio.git
@@ -127,7 +132,7 @@ node node_modules/electron/install.js
 npm run desktop
 ```
 
-Use `npm run check` to validate code and desktop flows, `npm run pack` to build the app, and `npm run dist` to create the distribution archive. See [contributing](CONTRIBUTING.md) for development conventions and [security](SECURITY.md) for reporting security issues.
+Use `npm run check` to validate code and desktop flows, `npm run pack` to build the app, and `npm run dist` to create a macOS ZIP or Windows installer. See [contributing](CONTRIBUTING.md) for development conventions and [security](SECURITY.md) for reporting security issues.
 
 For connection or operation problems, copy or export diagnostics from **Settings → About and updates** or Agent settings. Local logs are capped at about 1 MB. They contain runtime events and error categories, excluding document text, conversations, credentials and sign-in links. Exporting does not send the report.
 
@@ -141,4 +146,5 @@ For connection or operation problems, copy or export diagnostics from **Settings
 
 - Multiple windows and reading-position restoration across sessions.
 - Document references, backlinks and related-document navigation.
-- Developer ID signing, notarization and additional platforms.
+- Code signing, Apple notarization, Windows update support and broader platform validation.
+

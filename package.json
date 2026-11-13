@@ -1,7 +1,7 @@
 {
   "name": "folio-markdown",
   "productName": "Folio",
-  "version": "0.5.0-beta.24",
+  "version": "0.5.0-beta.25",
   "private": true,
   "license": "Apache-2.0",
   "repository": {
@@ -19,9 +19,9 @@
     "build": "tsc -b && vite build && node scripts/build-cli.mjs && node scripts/build-updater.mjs && node scripts/collect-licenses.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "npm run format:check && npm run test && npm run build && node scripts/verify-cli.mjs && node scripts/verify-desktop.mjs --scenario all --language en && node scripts/verify-heading.mjs && node scripts/verify-editor-regressions.mjs && node scripts/verify-updater.mjs && node scripts/verify-shutdown.mjs",
-    "pack": "npm run build && electron-builder --mac dir && node scripts/verify-package.mjs",
+    "pack": "npm run build && node scripts/package.mjs --dir && node scripts/verify-package.mjs",
     "verify:package": "node scripts/verify-package.mjs",
-    "dist": "npm run build && electron-builder --mac zip && node scripts/verify-package.mjs",
+    "dist": "npm run build && node scripts/package.mjs && node scripts/verify-package.mjs",
     "cli": "node cli/main.cjs",
     "format": "prettier --write src core electron cli scripts tests vite.config.ts tsconfig.json",
     "format:check": "prettier --check src core electron cli scripts tests vite.config.ts tsconfig.json",
@@ -109,7 +109,21 @@
         "zip"
       ],
       "identity": null,
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "extraResources": [
+        {
+          "from": "scripts/folio-bundled.sh",
+          "to": "bin/folio"
+        },
+        {
+          "from": "dist-updater",
+          "to": "updater",
+          "filter": [
+            "folio-update-helper",
+            "build-info.json"
+          ]
+        }
+      ]
     },
     "fileAssociations": [
       {
@@ -136,22 +150,38 @@
         ]
       },
       {
-        "from": "scripts/folio-bundled.sh",
-        "to": "bin/folio"
-      },
-      {
         "from": "integrations",
         "to": "integrations"
-      },
-      {
-        "from": "dist-updater",
-        "to": "updater",
-        "filter": [
-          "folio-update-helper",
-          "build-info.json"
-        ]
       }
     ],
-    "copyright": "Copyright © 2026 MemTensor"
+    "copyright": "Copyright © 2026 MemTensor",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/Folio.iconset/icon_256x256.png",
+      "artifactName": "Folio-${version}-windows-${arch}-setup.${ext}",
+      "extraResources": [
+        {
+          "from": "scripts/folio-bundled.cmd",
+          "to": "bin/folio.cmd"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Folio",
+      "deleteAppDataOnUninstall": false,
+      "license": "LICENSE"
+    }
   }
 }
